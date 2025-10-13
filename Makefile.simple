@@ -1,0 +1,86 @@
+# Simple Automation Makefile (Q30S Approach)
+# Instead of complex agent systems, we use simple, reliable shell scripts
+
+.PHONY: help build test deploy clean logs monitor health
+
+# Default target
+help:
+	@echo "Q30S Hybrid Approach - Simple Automation"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  build      - Build the application"
+	@echo "  test       - Run tests"
+	@echo "  test-all   - Run all tests with coverage"
+	@echo "  deploy     - Deploy to development"
+	@echo "  logs       - Show application logs"
+	@echo "  monitor    - Show system status"
+	@echo "  health     - Check application health"
+	@echo "  clean      - Clean build artifacts"
+
+# Build the application
+build:
+	@echo "Building nutrition-api..."
+	go mod tidy
+	go build -o bin/nutrition-api main.go
+	@echo "Build complete: bin/nutrition-api"
+
+# Run basic tests
+test:
+	@echo "Running tests..."
+	go test ./internal/...
+
+# Run comprehensive tests with coverage
+test-all:
+	@echo "Running comprehensive test suite..."
+	go test -v -race -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Deploy to development environment
+deploy:
+	@echo "Deploying to development..."
+	go build -o bin/nutrition-api main.go
+	@echo "Stopping existing service..."
+	-pkill -f nutrition-api || true
+	@echo "Starting new service..."
+	nohup ./bin/nutrition-api > app.log 2>&1 &
+	@echo "Deployment complete. Process ID: $$(pgrep -f nutrition-api)"
+	@sleep 2
+	@make health
+
+# Show application logs
+logs:
+	@echo "Recent application logs:"
+	tail -f app.log
+
+# Monitor system status
+monitor:
+	@echo "=== System Status ==="
+	@echo "Process info:"
+	pgrep -f nutrition-api || echo "No nutrition-api process running"
+	@echo ""
+	@echo "Port usage:"
+	netstat -tlnp 2>/dev/null | grep :8080 || echo "Port 8080 is free"
+	@echo ""
+	@echo "Disk usage:"
+	df -h | grep -E "(Filesystem|/dev/)"
+	@echo ""
+	@echo "Memory usage:"
+	free -h
+
+# Health check
+health:
+	@echo "Checking application health..."
+	@if curl -f http://localhost:8080/health >/dev/null 2>&1; then \
+		echo "✅ Application is healthy"; \
+	else \
+		echo "❌ Application health check failed"; \
+		exit 1; \
+	fi
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning build artifacts..."
+	rm -rf bin/
+	rm -f coverage.out coverage.html app.log
+	@echo "Clean complete"

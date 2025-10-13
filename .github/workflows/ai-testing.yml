@@ -1,0 +1,89 @@
+name: AI Testing
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  ai-test-coordination:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install test dependencies
+        run: |
+          pip install pytest pytest-cov pytest-json-report pytest-metadata
+          pip install requests psutil
+      
+      - name: Get test recommendations from AI
+        id: ai-tests
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          
+          # Get relevant test patterns
+          knowledge = coord.get_relevant_knowledge('testing best practices')
+          if knowledge:
+              print(f'Found {len(knowledge)} testing patterns')
+              for k in knowledge:
+                  print(f'  - Pattern with {k.get("success_count", 0)} successes')
+          
+          coord.register_agent_activity('pytest', {
+              'description': 'Running comprehensive tests',
+              'task_type': 'testing',
+              'pr_number': '${{ github.event.pull_request.number }}'
+          })
+          "
+      
+      - name: Run comprehensive tests
+        run: |
+          pytest tests/ -v \
+            --cov \
+            --cov-report=json \
+            --json-report \
+            --json-report-file=test-report.json
+      
+      - name: Share test results
+        if: always()
+        run: |
+          python3 -c "
+          import json
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          
+          coord = AIAgentCoordinator()
+          
+          # Load test results
+          try:
+              with open('test-report.json') as f:
+                  results = json.load(f)
+              
+              coord.complete_agent_activity('pytest', {
+                  'description': 'Completed comprehensive tests',
+                  'success': results.get('summary', {}).get('failed', 1) == 0,
+                  'tests_passed': results.get('summary', {}).get('passed', 0),
+                  'tests_failed': results.get('summary', {}).get('failed', 0),
+                  'task_type': 'testing',
+                  'approach': 'pytest with coverage',
+                  'pattern': 'comprehensive testing'
+              })
+          except Exception as e:
+              print(f'Could not load test results: {e}')
+          "
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-report.json
+            coverage.json

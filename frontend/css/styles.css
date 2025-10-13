@@ -58,9 +58,8 @@ p.subtitle { color: var(--muted); font-size: 16px; }
 }
 .card {
   display: block; background: var(--card); border-radius: 16px; padding: 18px; box-shadow: var(--shadow);
-  text-decoration: none; color: inherit; transition: transform .15s ease, box-shadow .15s ease;
+  text-decoration: none; color: inherit;
 }
-.card:hover { transform: translateY(-3px); box-shadow: 0 14px 28px rgba(2,6,23,.12); }
 .card-icon { font-size: 32px; }
 
 .cta { margin: 36px 0; padding: 18px; background: #fffbe6; border-left: 6px solid var(--warn); border-radius: 8px; }
@@ -107,4 +106,25 @@ p.subtitle { color: var(--muted); font-size: 16px; }
 .btn-ghost { background: #eef6ff; color: var(--primary); }
 
 
+/* Performance optimizations to prevent flickering and visual artifacts */
+* {
+  /* Prevent flickering on hover and focus states */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
+/* Optimize gradient rendering */
+.topbar,
+.plan-head {
+  /* Force hardware acceleration for gradients */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Prevent layout shifts and flickering */
+.card,
+.plan-card {
+  /* Ensure stable rendering */
+  contain: layout style paint;
+  will-change: auto;
+}

@@ -1,8 +1,8 @@
 # Coolify Environment Variables
-# Generated: Wed Oct  1 09:01:34 EEST 2025
+# Generated: Sat Oct  4 12:46:02 EEST 2025
 # Application: hcw0gc8wcwk440gw4c88408o
 
-JWT_SECRET=sE6oOg8fJkAuXZlC21TDQphFVK613/hh5HQQhMsHKMmR5QilVXk2/jDGnPaY+9II
+JWT_SECRET=yzLdohQXs+FcI+Hcjw4O/3nAVuBPC6FPbfw1quUbhIhuxxFoYO51TonBIa80IQIw
 ENV=production
 PORT=8081
 HOST=0.0.0.0

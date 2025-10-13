@@ -1,0 +1,50 @@
+name: AI Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_id:
+        description: 'Coolify App ID'
+        required: true
+      force_rebuild:
+        description: 'Force rebuild'
+        required: false
+        default: 'false'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: AI-coordinated deployment
+        env:
+          COOLIFY_API_URL: https://api.doctorhealthy1.com
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+        run: |
+          python3 orchestration/coolify_integration.py deploy ${{ github.event.inputs.app_id }}
+      
+      - name: Monitor deployment
+        run: |
+          echo "Monitoring deployment health..."
+          sleep 30
+          
+          python3 -c "
+          from orchestration.coolify_integration import CoolifyAIIntegration
+          integration = CoolifyAIIntegration()
+          
+          # Check app status
+          details = integration.get_application_details('${{ github.event.inputs.app_id }}')
+          if details:
+              print(f'✅ Application status: {details.get("status", "unknown")}')
+          "

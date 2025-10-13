@@ -385,7 +385,7 @@ func (dc *DeploymentConfig) ValidateDockerSetup() error {
 
 	// Check if Docker is installed and running
 	if err := dc.checkDockerInstallation(); err != nil {
-		return fmt.Errorf("Docker validation failed: %w", err)
+		return fmt.Errorf("docker validation failed: %w", err)
 	}
 
 	// Check if required ports are available
@@ -397,7 +397,7 @@ func (dc *DeploymentConfig) ValidateDockerSetup() error {
 
 	// Validate Dockerfile exists and is valid
 	if err := dc.validateDockerfile(); err != nil {
-		return fmt.Errorf("Dockerfile validation failed: %w", err)
+		return fmt.Errorf("dockerfile validation failed: %w", err)
 	}
 
 	log.Println("✅ Docker setup validation passed")
@@ -408,13 +408,13 @@ func (dc *DeploymentConfig) ValidateDockerSetup() error {
 func (dc *DeploymentConfig) checkDockerInstallation() error {
 	cmd := exec.Command("docker", "--version")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Docker is not installed or not accessible")
+		return fmt.Errorf("docker is not installed or not accessible")
 	}
 
 	// Check if Docker daemon is running
 	cmd = exec.Command("docker", "info")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Docker daemon is not running")
+		return fmt.Errorf("docker daemon is not running")
 	}
 
 	return nil
@@ -423,13 +423,13 @@ func (dc *DeploymentConfig) checkDockerInstallation() error {
 // validateDockerfile validates the Dockerfile syntax
 func (dc *DeploymentConfig) validateDockerfile() error {
 	if _, err := os.Stat("Dockerfile"); os.IsNotExist(err) {
-		return fmt.Errorf("Dockerfile does not exist")
+		return fmt.Errorf("dockerfile does not exist")
 	}
 
 	// Basic syntax check
 	cmd := exec.Command("docker", "build", "--dry-run", ".")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Dockerfile syntax check failed")
+		return fmt.Errorf("dockerfile syntax check failed")
 	}
 
 	return nil
@@ -479,7 +479,7 @@ func (dc *DeploymentConfig) ValidateCoolifyDeployment() error {
 	// Check environment variables
 	for _, envVar := range dc.RequiredEnvVars {
 		if os.Getenv(envVar) == "" {
-			return fmt.Errorf("Coolify requires environment variable: %s", envVar)
+			return fmt.Errorf("coolify requires environment variable: %s", envVar)
 		}
 	}
 

@@ -1,0 +1,97 @@
+{
+    "version": "1.0.0",
+    "storage": {
+        "type": "json",
+        "base_path": "./shared",
+        "max_file_size_mb": 5,
+        "auto_cleanup": true,
+        "retention_days": 30
+    },
+    "locking": {
+        "enabled": true,
+        "timeout_seconds": 5,
+        "retry_attempts": 3
+    },
+    "agents": {
+        "kilocode": {
+            "enabled": true,
+            "permissions": [
+                "read",
+                "write"
+            ]
+        },
+        "roocode": {
+            "enabled": true,
+            "permissions": [
+                "read",
+                "write"
+            ]
+        },
+        "cline": {
+            "enabled": true,
+            "permissions": [
+                "read",
+                "write"
+            ]
+        }
+    },
+    "categories": {
+        "context": {
+            "description": "Current work context and state",
+            "ttl_hours": 24
+        },
+        "knowledge": {
+            "description": "Persistent knowledge base",
+            "ttl_hours": null
+        },
+        "tasks": {
+            "description": "Task queue and assignments",
+            "ttl_hours": 48
+        },
+        "history": {
+            "description": "Action history and logs",
+            "ttl_hours": 168
+        },
+        "agent_activity": {
+            "description": "Current agent activities and status",
+            "ttl_hours": 24
+        },
+        "agent_results": {
+            "description": "Completed agent task results",
+            "ttl_hours": 168
+        },
+        "learning": {
+            "description": "Learning database and patterns",
+            "ttl_hours": null
+        },
+        "failures": {
+            "description": "Failure tracking and lessons learned",
+            "ttl_hours": 168
+        },
+        "collaboration": {
+            "description": "Collaboration sessions",
+            "ttl_hours": 48
+        },
+        "deployment_pipeline": {
+            "description": "Deployment pipeline tasks",
+            "ttl_hours": 48
+        },
+        "deployment_success": {
+            "description": "Successful deployments",
+            "ttl_hours": 720
+        },
+        "pipeline_execution": {
+            "description": "CI/CD pipeline executions",
+            "ttl_hours": 168
+        }
+    },
+    "indexing": {
+        "enabled": true,
+        "fields": [
+            "timestamp",
+            "agent",
+            "category",
+            "tags"
+        ]
+    }
+}

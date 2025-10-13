@@ -15,6 +15,20 @@ vip-*.js
 *.db
 *.log
 
+# Security - Environment and Credentials (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.json
+*_token.txt
+*_secret.txt
+api_keys.txt
+
 # IDE
 .vscode/
 .idea/
@@ -25,4 +39,14 @@ vip-*.js
 .cursor/rules/byterover-rules.mdc
 .kiro/steering/byterover-rules.md
 .qoder/rules/byterover-rules.md
-.augment/rules/byterover-rules.md
+.augment/rules/byterover-rules.md# Add to existing .gitignore
+.DS_Store
+.env.development
+.env.local
+.env.*.local
+*.key
+*.pem
+credentials.json
+secrets.json
+*_token.txt
+*_secret.txt

@@ -1,0 +1,61 @@
+{
+  "id": "2788f2f660f65ed485d4770b90cbc611",
+  "category": "deployment_pipeline",
+  "key": "d2f38812",
+  "agent": "coolify_integration",
+  "timestamp": "2025-10-12T06:53:23.136071",
+  "tags": [
+    "deployment",
+    "pipeline",
+    "coolify"
+  ],
+  "data": {
+    "session": {
+      "session_id": "d2f38812",
+      "name": "Coolify Deployment Pipeline",
+      "agents": [
+        "kilocode",
+        "cline",
+        "copilot"
+      ],
+      "goal": "Automate deployment to Coolify with AI coordination",
+      "start_time": "2025-10-12T09:53:23.010239",
+      "status": "active",
+      "shared_context": {},
+      "results": []
+    },
+    "tasks": [
+      {
+        "description": "Run tests before deployment",
+        "type": "testing",
+        "dependencies": [],
+        "assigned_to": "copilot"
+      },
+      {
+        "description": "Build Docker image",
+        "type": "build",
+        "dependencies": [
+          "Run tests before deployment"
+        ],
+        "assigned_to": "cline"
+      },
+      {
+        "description": "Trigger Coolify deployment",
+        "type": "deployment",
+        "dependencies": [
+          "Build Docker image"
+        ],
+        "assigned_to": "coolify_integration"
+      },
+      {
+        "description": "Monitor deployment health",
+        "type": "monitoring",
+        "dependencies": [
+          "Trigger Coolify deployment"
+        ],
+        "assigned_to": "cline"
+      }
+    ],
+    "status": "ready"
+  }
+}

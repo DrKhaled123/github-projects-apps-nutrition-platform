@@ -291,14 +291,6 @@ func (pm *PerformanceMonitor) GetSlowOperations() []SlowOperationReport {
 	return result
 }
 
-// operationStats holds statistics for an operation
-type operationStats struct {
-	Count     int
-	TotalTime time.Duration
-	MaxTime   time.Duration
-	Threshold time.Duration
-}
-
 // SlowOperationReport reports on slow operations
 type SlowOperationReport struct {
 	Operation       string        `json:"operation"`

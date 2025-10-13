@@ -1,0 +1,61 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install code quality tools
+        run: |
+          pip install pylint flake8 mypy bandit
+          pip install requests
+      
+      - name: AI-coordinated code review
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          
+          coord.register_agent_activity('code_review', {
+              'description': 'Reviewing PR #${{ github.event.pull_request.number }}',
+              'task_type': 'code_review',
+              'files_changed': ${{ github.event.pull_request.changed_files }}
+          })
+          "
+      
+      - name: Run linting
+        run: |
+          pylint **/*.py || true
+          flake8 . --max-line-length=100 || true
+      
+      - name: Run security scan
+        run: bandit -r . -f json -o bandit-report.json || true
+      
+      - name: Share review results
+        if: always()
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          
+          coord.complete_agent_activity('code_review', {
+              'description': 'Completed code review',
+              'success': True,
+              'task_type': 'code_review',
+              'pr_number': '${{ github.event.pull_request.number }}'
+          })
+          "

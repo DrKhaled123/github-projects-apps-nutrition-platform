@@ -304,17 +304,6 @@ func main() {
 	log.Println("Server exited")
 }
 
-// Version can be set at build time with -ldflags "-X main.version=x.x.x"
-var version = "1.0.0"
-
-// getVersion returns the application version
-func getVersion() string {
-	if v := os.Getenv("APP_VERSION"); v != "" {
-		return v
-	}
-	return version
-}
-
 // CustomValidator wraps the validator
 type CustomValidator struct {
 	validator *validator.Validate

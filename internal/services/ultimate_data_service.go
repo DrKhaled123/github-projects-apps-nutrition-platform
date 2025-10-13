@@ -40,6 +40,10 @@ func NewUltimateDataService() *UltimateDataService {
 	}
 }
 
+// Note: Fallback database loaders are currently unused but kept for potential future use
+// If needed, they can be re-enabled by uncommenting the functions below
+
+/*
 // loadFallbackDatabases loads individual complete databases as fallback
 func (s *UltimateDataService) loadFallbackDatabases() {
 	log.Println("🔄 Loading fallback databases...")
@@ -155,6 +159,7 @@ func (s *UltimateDataService) loadVitaminsMineralsDatabase() error {
 	log.Println("✅ Complete vitamins/minerals database loaded")
 	return nil
 }
+*/
 
 // LoadData loads the ultimate comprehensive database
 func (s *UltimateDataService) LoadData() error {

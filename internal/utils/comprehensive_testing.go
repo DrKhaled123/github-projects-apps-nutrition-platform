@@ -607,7 +607,12 @@ func (cts *ComprehensiveTestSuite) GenerateTestReport(results *TestResults) stri
 
 	// Individual test results
 	for testType, result := range results.Results {
-		report += fmt.Sprintf("## %s Tests\n", strings.Title(testType))
+		// Capitalize first letter manually (simple replacement for deprecated strings.Title)
+		titleCase := testType
+		if len(titleCase) > 0 {
+			titleCase = string(titleCase[0]-32) + titleCase[1:]
+		}
+		report += fmt.Sprintf("## %s Tests\n", titleCase)
 		report += fmt.Sprintf("- **Result**: %s\n", func() string {
 			if result.Passed {
 				return "✅ PASSED"

@@ -1,0 +1,75 @@
+name: AI Learning
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
+
+jobs:
+  analyze-patterns:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: Analyze patterns and generate insights
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          from datetime import datetime
+          
+          coord = AIAgentCoordinator()
+          
+          print('=' * 60)
+          print('AI Learning Summary - Weekly Report')
+          print('=' * 60)
+          print()
+          
+          # Get agent status
+          status = coord.get_agent_status_summary()
+          print('📊 Agent Status:')
+          for agent, info in status.items():
+              print(f'  {agent}: {info}')
+          
+          print()
+          
+          # Get learning patterns
+          if coord.memory:
+              patterns = coord.memory.query(
+                  category='learning',
+                  tags=['best_practices'],
+                  limit=50
+              )
+              
+              print(f'📚 Learning Database: {len(patterns)} patterns')
+              
+              # Analyze success patterns
+              successful = [p for p in patterns if p.get('data', {}).get('success_count', 0) > 0]
+              print(f'✅ Successful patterns: {len(successful)}')
+              
+              # Top patterns
+              sorted_patterns = sorted(
+                  successful,
+                  key=lambda x: x.get('data', {}).get('success_count', 0),
+                  reverse=True
+              )
+              
+              print()
+              print('🏆 Top 5 Most Successful Patterns:')
+              for i, pattern in enumerate(sorted_patterns[:5], 1):
+                  data = pattern.get('data', {})
+                  print(f'  {i}. Success count: {data.get("success_count", 0)}')
+                  print(f'     Agents: {data.get("agents_used", [])}')
+                  print()
+          
+          print('💡 Recommendation: Review top patterns for best practices')
+          "

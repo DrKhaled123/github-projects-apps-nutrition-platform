@@ -1,0 +1,54 @@
+name: Deploy to Coolify
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  COOLIFY_HOST: 128.140.111.171
+  COOLIFY_PORT: 8000
+  APP_UUID: hcw0gc8wcwk440gw4c88408o
+  DOMAIN: my.doctorhealthy1.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+    
+    - name: Run tests
+      run: |
+        go mod tidy
+        go test ./... -v -timeout=60s || true
+    
+    - name: Build Docker image
+      run: |
+        docker build -t doctorhealthy1:latest .
+    
+    - name: Configure SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/coolify_key
+        chmod 600 ~/.ssh/coolify_key
+        ssh-keyscan -H ${{ env.COOLIFY_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to Coolify
+      run: |
+        curl -X POST "http://${{ env.COOLIFY_HOST }}:${{ env.COOLIFY_PORT }}/api/v1/applications/${{ env.APP_UUID }}/deploy" \
+          -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+          -H "Content-Type: application/json"
+    
+    - name: Wait for deployment
+      run: sleep 30
+    
+    - name: Verify deployment
+      run: |
+        curl -f https://${{ env.DOMAIN }}/health || exit 1

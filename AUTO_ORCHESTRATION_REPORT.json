@@ -1,0 +1,69 @@
+{
+  "timestamp": "2025-10-05T11:41:47.084345",
+  "overall_success": true,
+  "phases_completed": 5,
+  "errors": 0,
+  "warnings": 2,
+  "details": {
+    "timestamp": "2025-10-05T11:41:47.084345",
+    "phases": {
+      "backend": {
+        "steps": [
+          {
+            "name": "go_version",
+            "status": "success",
+            "output": "go version go1.25.0 darwin/arm64"
+          },
+          {
+            "name": "build",
+            "status": "success"
+          }
+        ],
+        "success": true
+      },
+      "docker": {
+        "steps": [
+          {
+            "name": "docker_build",
+            "status": "success"
+          }
+        ],
+        "success": true
+      },
+      "frontend": {
+        "steps": [],
+        "success": true
+      },
+      "integration": {
+        "steps": [
+          {
+            "endpoint": "/health",
+            "status": "200",
+            "result": "pass"
+          },
+          {
+            "endpoint": "/api/v1/recipes",
+            "status": "429",
+            "result": "fail"
+          },
+          {
+            "endpoint": "/api/v1/vip/summary",
+            "status": "429",
+            "result": "fail"
+          }
+        ],
+        "success": true
+      },
+      "deployment_prep": {
+        "steps": [],
+        "success": true
+      }
+    },
+    "errors": [],
+    "warnings": [
+      "Some backend tests failed",
+      "SSH connection needs verification"
+    ],
+    "success": true
+  }
+}

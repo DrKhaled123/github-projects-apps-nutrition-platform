@@ -1,0 +1,19 @@
+{
+  "id": "37d16c3b4c001489ed13a60ec9154359",
+  "category": "learning",
+  "key": "f40be780973d",
+  "agent": "coordinator",
+  "timestamp": "2025-10-12T06:53:03.764532",
+  "tags": [
+    "learning",
+    "best_practices"
+  ],
+  "data": {
+    "pattern": "REST API",
+    "success_count": 1,
+    "agents_used": [
+      "kilocode"
+    ],
+    "best_practices": []
+  }
+}

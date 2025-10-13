@@ -1,0 +1,25 @@
+{
+  "id": "aed8d9c84582b4f05b92986959c32c12",
+  "category": "collaboration",
+  "key": "d2f38812",
+  "agent": "coordinator",
+  "timestamp": "2025-10-12T06:53:23.012042",
+  "tags": [
+    "collaboration",
+    "session"
+  ],
+  "data": {
+    "session_id": "d2f38812",
+    "name": "Coolify Deployment Pipeline",
+    "agents": [
+      "kilocode",
+      "cline",
+      "copilot"
+    ],
+    "goal": "Automate deployment to Coolify with AI coordination",
+    "start_time": "2025-10-12T09:53:23.010239",
+    "status": "active",
+    "shared_context": {},
+    "results": []
+  }
+}

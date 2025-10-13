@@ -1,0 +1,273 @@
+name: AI-Coordinated CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      agent_mode:
+        description: 'AI Agent Mode'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - parallel
+          - sequential
+
+jobs:
+  ai-coordination:
+    runs-on: ubuntu-latest
+    outputs:
+      task-assignments: ${{ steps.coordinate.outputs.assignments }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-pcap.txt || true
+          pip install requests psutil flask pytest
+      
+      - name: AI Coordination
+        id: coordinate
+        run: |
+          python3 orchestration/ai_agent_coordinator.py
+          echo "assignments=$(python3 orchestration/ai_agent_coordinator.py --output-json)" >> $GITHUB_OUTPUT
+      
+      - name: Share coordination context
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          coord.register_agent_activity('github_actions', {
+              'description': 'Running CI/CD pipeline',
+              'commit': '${{ github.sha }}',
+              'branch': '${{ github.ref }}'
+          })
+          "
+
+  test:
+    needs: ai-coordination
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-type: [unit, integration, security]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install pytest pytest-cov bandit safety
+      
+      - name: Check for duplicate work
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          dup = coord.check_duplicate_work('Running ${{ matrix.test-type }} tests')
+          if dup:
+              print('⚠️  Another agent is already running these tests')
+              exit(1)
+          "
+      
+      - name: Run ${{ matrix.test-type }} tests
+        run: |
+          if [ "${{ matrix.test-type }}" == "unit" ]; then
+            pytest tests/ -v --cov
+          elif [ "${{ matrix.test-type }}" == "integration" ]; then
+            pytest tests/integration/ -v
+          elif [ "${{ matrix.test-type }}" == "security" ]; then
+            bandit -r . -f json -o security-report.json || true
+            safety check --json > safety-report.json || true
+          fi
+      
+      - name: Share test results
+        if: always()
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          coord.complete_agent_activity('github_actions_test', {
+              'description': 'Completed ${{ matrix.test-type }} tests',
+              'success': ${{ job.status == 'success' }},
+              'test_type': '${{ matrix.test-type }}',
+              'task_type': 'testing'
+          })
+          "
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: AI-coordinated build
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          knowledge = coord.get_relevant_knowledge('docker build optimization')
+          print(f'Found {len(knowledge)} relevant build patterns')
+          coord.register_agent_activity('docker_build', {
+              'description': 'Building Docker image',
+              'task_type': 'build'
+          })
+          "
+      
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/nutrition-platform:${{ github.sha }} .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/nutrition-platform:latest .
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/nutrition-platform:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/nutrition-platform:latest
+      
+      - name: Share build results
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          coord.complete_agent_activity('docker_build', {
+              'description': 'Built and pushed Docker image',
+              'success': True,
+              'image_tag': '${{ github.sha }}',
+              'task_type': 'build',
+              'approach': 'Multi-stage Docker build',
+              'pattern': 'Docker optimization'
+          })
+          "
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: AI-coordinated deployment
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+        run: |
+          python3 -c "
+          from orchestration.coolify_integration import CoolifyAIIntegration
+          import os
+          
+          # Set environment variables
+          os.environ['COOLIFY_API_URL'] = 'https://api.doctorhealthy1.com'
+          os.environ['COOLIFY_API_TOKEN'] = '${{ secrets.COOLIFY_API_TOKEN }}'
+          
+          integration = CoolifyAIIntegration()
+          apps = integration.get_applications()
+          
+          if apps:
+              # Deploy first app (or specify app_id)
+              app_id = apps[0].get('id')
+              result = integration.execute_coordinated_deployment(app_id)
+              print(f'Deployment: {result}')
+          "
+      
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+            python3 -c "
+            from orchestration.ai_agent_coordinator import AIAgentCoordinator
+            coord = AIAgentCoordinator()
+            coord.share_failure_learning('github_deployment', {
+                'description': 'Deployment failed',
+                'commit': '${{ github.sha }}',
+                'lesson': 'Check Coolify API configuration'
+            })
+            "
+          fi
+
+  ai-learning:
+    needs: [test, build, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: Collect and share learnings
+        run: |
+          python3 -c "
+          from orchestration.ai_agent_coordinator import AIAgentCoordinator
+          coord = AIAgentCoordinator()
+          
+          # Get all agent activities
+          status = coord.get_agent_status_summary()
+          print('📊 Agent Status Summary:')
+          for agent, info in status.items():
+              print(f'  {agent}: {info}')
+          
+          # Save pipeline results
+          if coord.memory:
+              coord.memory.write(
+                  category='pipeline_execution',
+                  key='run_${{ github.run_id }}',
+                  data={
+                      'workflow': 'AI-Coordinated CI/CD',
+                      'commit': '${{ github.sha }}',
+                      'branch': '${{ github.ref }}',
+                      'test_status': '${{ needs.test.result }}',
+                      'build_status': '${{ needs.build.result }}',
+                      'deploy_status': '${{ needs.deploy.result }}',
+                      'timestamp': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+                  },
+                  agent='github_actions',
+                  tags=['pipeline', 'cicd', 'learning']
+              )
+              print('✅ Shared pipeline results with all AI agents')
+          "

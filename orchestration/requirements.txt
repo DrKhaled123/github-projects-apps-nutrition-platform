@@ -1,0 +1,26 @@
+# Orchestration System Requirements
+
+# Core dependencies
+requests>=2.31.0
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-json-report>=1.5.0
+
+# Code quality and security
+pylint>=3.0.0
+flake8>=6.1.0
+mypy>=1.7.0
+bandit>=1.7.5
+safety>=2.3.5
+
+# Testing frameworks (optional, install as needed)
+# pytest-asyncio>=0.21.0
+# pytest-mock>=3.12.0
+
+# Docker and container tools (installed via system package manager)
+# docker
+# trivy (for image scanning)
+
+# Note: Some dependencies are optional based on your project type
+# JavaScript projects: eslint, snyk (installed via npm)
+# Go projects: golint, go vet (installed via go)

@@ -1,0 +1,218 @@
+{
+    "version": "1.0.0",
+    "pipeline": {
+        "name": "CI/CD Orchestration Pipeline",
+        "stages": [
+            "test",
+            "review",
+            "build",
+            "deploy"
+        ],
+        "fail_fast": true,
+        "parallel_execution": false,
+        "notification_channels": [
+            "slack",
+            "email",
+            "shared_memory"
+        ]
+    },
+    "testing": {
+        "enabled": true,
+        "frameworks": {
+            "python": [
+                "pytest",
+                "unittest"
+            ],
+            "javascript": [
+                "jest",
+                "mocha"
+            ],
+            "go": [
+                "go test"
+            ]
+        },
+        "coverage": {
+            "enabled": true,
+            "threshold": 80,
+            "fail_under_threshold": false
+        },
+        "test_types": {
+            "unit": {
+                "enabled": true,
+                "path": "tests/unit",
+                "timeout_seconds": 120
+            },
+            "integration": {
+                "enabled": true,
+                "path": "tests/integration",
+                "timeout_seconds": 300
+            },
+            "e2e": {
+                "enabled": false,
+                "path": "tests/e2e",
+                "timeout_seconds": 600
+            }
+        },
+        "retry": {
+            "enabled": true,
+            "max_attempts": 3,
+            "delay_seconds": 5
+        }
+    },
+    "review": {
+        "enabled": true,
+        "static_analysis": {
+            "python": {
+                "tools": [
+                    "pylint",
+                    "flake8",
+                    "mypy"
+                ],
+                "config_files": {
+                    "pylint": ".pylintrc",
+                    "flake8": ".flake8",
+                    "mypy": "mypy.ini"
+                }
+            },
+            "javascript": {
+                "tools": [
+                    "eslint",
+                    "tslint"
+                ],
+                "config_files": {
+                    "eslint": ".eslintrc.json"
+                }
+            },
+            "go": {
+                "tools": [
+                    "golint",
+                    "go vet"
+                ]
+            }
+        },
+        "security": {
+            "python": {
+                "tools": [
+                    "bandit",
+                    "safety"
+                ],
+                "severity_threshold": "medium"
+            },
+            "javascript": {
+                "tools": [
+                    "npm audit",
+                    "snyk"
+                ]
+            }
+        },
+        "quality_gate": {
+            "enabled": true,
+            "rules": {
+                "min_code_score": 7.0,
+                "max_complexity": 10,
+                "max_duplications": 5,
+                "no_critical_vulnerabilities": true
+            },
+            "block_on_failure": false
+        }
+    },
+    "build": {
+        "enabled": true,
+        "docker": {
+            "file": "Dockerfile",
+            "context": ".",
+            "platform": "linux/amd64",
+            "cache": true,
+            "multi_stage": true,
+            "build_args": {
+                "PYTHON_VERSION": "3.11",
+                "NODE_VERSION": "18"
+            }
+        },
+        "optimization": {
+            "enabled": true,
+            "minimize_layers": true,
+            "remove_build_deps": true,
+            "compress": true
+        },
+        "tagging": {
+            "strategy": "semantic",
+            "tags": [
+                "latest",
+                "{version}",
+                "{git_commit}",
+                "{timestamp}"
+            ]
+        },
+        "registry": {
+            "type": "docker_hub",
+            "url": "registry.hub.docker.com",
+            "username": "${DOCKER_USERNAME}",
+            "password": "${DOCKER_PASSWORD}",
+            "repository": "your-org/your-app"
+        },
+        "scan": {
+            "enabled": true,
+            "tool": "trivy",
+            "fail_on_severity": "high"
+        }
+    },
+    "deploy": {
+        "enabled": true,
+        "coolify": {
+            "api_url": "${COOLIFY_API_URL}",
+            "api_token": "${COOLIFY_API_TOKEN}",
+            "project_id": "${COOLIFY_PROJECT_ID}",
+            "application_id": "${COOLIFY_APP_ID}",
+            "environment": "production"
+        },
+        "strategy": {
+            "type": "rolling",
+            "batch_size": 1,
+            "wait_between_batches": 30
+        },
+        "health_check": {
+            "enabled": true,
+            "endpoint": "/health",
+            "expected_status": 200,
+            "timeout_seconds": 10,
+            "retries": 5,
+            "interval_seconds": 10
+        },
+        "rollback": {
+            "enabled": true,
+            "auto_rollback_on_failure": true,
+            "keep_previous_versions": 3
+        },
+        "notifications": {
+            "on_success": true,
+            "on_failure": true,
+            "channels": [
+                "slack",
+                "email"
+            ]
+        }
+    },
+    "shared_memory": {
+        "enabled": true,
+        "base_path": "./ai-agents-shared-memory",
+        "write_progress": true,
+        "write_reports": true,
+        "listen_for_triggers": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "orchestration/logs/orchestrator.log",
+        "max_size_mb": 100,
+        "backup_count": 10,
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    },
+    "monitoring": {
+        "enabled": true,
+        "dashboard_port": 8080,
+        "metrics": {
+            "prometheus_enabled": false,
+            "prometheus_port": 9090
+        }
+    }
+}
