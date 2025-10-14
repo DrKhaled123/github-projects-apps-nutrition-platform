@@ -1,4 +1,20 @@
 (function(){
+  // Add error handling for failed resource loads
+  window.addEventListener('error', function(e) {
+    console.error('Resource failed to load:', e.target.src || e.target.href);
+  });
+
+  window.addEventListener('unhandledrejection', function(e) {
+    console.error('Unhandled promise rejection:', e.reason);
+  });
+
+  // Add loading states
+  document.addEventListener('DOMContentLoaded', function() {
+    // Remove any loading spinners
+    const loaders = document.querySelectorAll('.loading');
+    loaders.forEach(loader => loader.style.display = 'none');
+  });
+
   const yearEl = document.getElementById('year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 

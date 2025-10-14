@@ -19,6 +19,7 @@ import (
 	"api-key-generator/internal/handlers"
 	"api-key-generator/internal/middleware"
 	"api-key-generator/internal/services"
+	"api-key-generator/internal/utils"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
@@ -43,13 +44,16 @@ func main() {
 		log.Fatalf("Configuration error: %v", err)
 	}
 
-	// Debug: Log configuration values (only in debug/development mode)
+	// Initialize secure logger
+	secureLogger := utils.NewSecureLogger(cfg.Logging.EnableDebug)
+
+	// Safely log configuration values (only in debug/development mode)
 	if cfg.Logging.EnableDebug {
-		log.Printf("[DEBUG] Server Port: %s", cfg.Server.Port)
-		log.Printf("[DEBUG] Database Path: %s", cfg.Database.Path)
-		log.Printf("[DEBUG] JWT Secret present: %t", os.Getenv("JWT_SECRET") != "")
-		log.Printf("[DEBUG] CORS Origins: %s", os.Getenv("CORS_ORIGINS"))
-		log.Printf("[DEBUG] Log Level: %s", cfg.Logging.Level)
+		secureLogger.LogConfigSafely("Server Port", cfg.Server.Port)
+		secureLogger.LogConfigSafely("Database Path", cfg.Database.Path)
+		secureLogger.CheckSecretPresence("JWT_SECRET")
+		secureLogger.LogConfigSafely("CORS Origins", os.Getenv("CORS_ORIGINS"))
+		secureLogger.LogConfigSafely("Log Level", cfg.Logging.Level)
 	}
 
 	// Initialize database
@@ -139,18 +143,12 @@ func main() {
 	// Centralized error handler
 	middleware.SetupErrorHandler(e)
 
-	// Health check
+	// Health check endpoints
 	e.GET("/health", handlers.HealthCheckHandler(db))
+	e.GET("/health/detailed", handlers.DetailedHealthCheckHandler(db))
 
 	// Readiness check
-	e.GET("/ready", func(c echo.Context) error {
-		// DB ping
-		if err := db.Ping(); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, map[string]interface{}{"ready": false, "reason": "db_unreachable"})
-		}
-		// Optionally check core data loaded later
-		return c.JSON(http.StatusOK, map[string]interface{}{"ready": true})
-	})
+	e.GET("/ready", handlers.ReadinessCheckHandler(db))
 
 	// API routes
 	api := e.Group("/api/v1")
@@ -230,14 +228,16 @@ func main() {
 		return serveStaticFile(c, "url-slug.html", embeddedFrontend)
 	})
 
-	// Serve CSS and JS assets
+	// Serve CSS and JS assets with cache headers
 	e.GET("/frontend/css/*", func(c echo.Context) error {
 		path := strings.TrimPrefix(c.Request().URL.Path, "/frontend/css/")
+		c.Response().Header().Set("Cache-Control", "public, max-age=31536000") // 1 year
 		return serveStaticFile(c, "css/"+path, embeddedFrontend)
 	})
 
 	e.GET("/frontend/js/*", func(c echo.Context) error {
 		path := strings.TrimPrefix(c.Request().URL.Path, "/frontend/js/")
+		c.Response().Header().Set("Cache-Control", "public, max-age=31536000") // 1 year
 		return serveStaticFile(c, "js/"+path, embeddedFrontend)
 	})
 
@@ -253,7 +253,7 @@ func main() {
 
 	// Check if port is available
 	if cfg.Logging.EnableDebug {
-		log.Printf("[DEBUG] Attempting to start server on port %s", cfg.Server.Port)
+		secureLogger.Debug("Attempting to start server on port %s", cfg.Server.Port)
 	}
 
 	// Start server
@@ -261,16 +261,16 @@ func main() {
 	go func() {
 		if err := e.Start(":" + cfg.Server.Port); err != nil && err != http.ErrServerClosed {
 			if cfg.Logging.EnableDebug {
-				log.Printf("[DEBUG] Server start error: %v", err)
+				secureLogger.Debug("Server start error: %v", err)
 			}
 			errorChan <- err
 		}
 	}()
 
-	log.Printf("🚀 Health Management System server started on port %s", cfg.Server.Port)
-	log.Printf("📊 Available features: API Keys, Nutrition Plans, Workout Plans, Health Management, Recipes, Ultimate Comprehensive Database, Sets/Reps Management, Warmup/Technique System, Comprehensive Workout System, Enhanced Health System")
-	log.Printf("🏆 Ultimate Database: 118+ items across 10 categories with full authentication")
-	log.Printf("🌟 Enhanced Health System: Diet Plans, Workout Plans, Lifestyle Management, Recipes, Injury Management, Supplement Guidance with PDF generation")
+	// Startup messages with secure logging
+	secureLogger.LogStartup(cfg.Server.Port, "API Keys, Nutrition Plans, Workout Plans, Health Management, Recipes, Ultimate Comprehensive Database, Sets/Reps Management, Warmup/Technique System, Comprehensive Workout System, Enhanced Health System")
+	secureLogger.LogFeature("🏆", "Ultimate Database: 118+ items across 10 categories with full authentication")
+	secureLogger.LogFeature("🌟", "Enhanced Health System: Diet Plans, Workout Plans, Lifestyle Management, Recipes, Injury Management, Supplement Guidance with PDF generation")
 
 	// Wait for interrupt signal or server error
 	quit := make(chan os.Signal, 1)
