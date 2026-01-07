@@ -1,0 +1,109 @@
+# Multi-stage production Dockerfile for DoctorHealthy Nutrition Platform
+# Optimized for size, security, and performance
+# Built for Dokploy deployment
+
+# Stage 1: Builder stage
+FROM node:18-alpine AS builder
+
+# Set environment variables
+ARG NODE_ENV=production
+ARG TARGETPLATFORM=linux/amd64
+
+# Install build dependencies
+RUN apk add --no-cache \
+    git \
+    python3 \
+    make \
+    g++ \
+    curl \
+    ca-certificates
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY go.mod go.sum ./
+
+# Install Go dependencies
+RUN go mod download
+
+# Install Node.js dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY . .
+
+# Build Go backend
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s -extldflags '-static -static-pie'" \
+    -a -installsuffix cgo \
+    -o main .
+
+# Build frontend with optimization
+RUN npm run build
+
+# Stage 2: Production stage
+FROM golang:1.21-alpine AS production
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    curl \
+    dumb-init \
+    tzdata \
+    sqlite \
+    sqlite-dev \
+    gcc \
+    musl-dev \
+    linux-headers \
+    git \
+    jq \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1001 -S appuser && \
+    adduser -u 1001 -S appuser -G appuser
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV TZ=UTC
+ENV GIN_MODE=release
+ENV CGO_ENABLED=1
+
+# Create app directory
+WORKDIR /app
+
+# Copy only necessary files from builder stage
+COPY --from=builder /app/main .
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/frontend ./frontend
+COPY --from=builder /app/go.mod .
+COPY --from=builder /app/go.sum .
+
+# Copy configuration files
+COPY --chown=appuser:appuser docker-compose.prod.yml ./
+COPY --chown=appuser:appuser .env.example .env.local
+COPY --chown=appuser:appuser scripts/ ./scripts/
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/ssl /app/backups && \
+    chown -R appuser:appuser /app
+
+# Set proper permissions
+RUN chmod +x scripts/*.sh || true
+
+# Switch to non-root user
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose port
+EXPOSE 8080
+
+# Run the application with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["./main"]

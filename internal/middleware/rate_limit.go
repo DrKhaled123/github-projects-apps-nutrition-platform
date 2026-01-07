@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
 	"api-key-generator/internal/rate"
+
+	"github.com/labstack/echo/v4"
 )
 
 // RateLimiter creates a middleware function that uses the unified rate limiter

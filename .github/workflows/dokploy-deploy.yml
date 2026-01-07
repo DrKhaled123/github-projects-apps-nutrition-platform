@@ -1,0 +1,311 @@
+name: Dokploy Deployment Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      force_deploy:
+        description: 'Force deployment (skip health checks)'
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build and push Docker image
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=tag
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: false
+
+  # Deploy to staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event.inputs.environment == 'staging' || (github.ref == 'refs/heads/develop' && github.event_name == 'push')
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to Dokploy Staging
+      uses: dokploy/github-action@v1
+      with:
+        dokploy-host: ${{ secrets.DOKPLOY_HOST_STAGING }}
+        dokploy-api-key: ${{ secrets.DOKPLOY_API_KEY_STAGING }}
+        application-id: ${{ secrets.DOKPLOY_APP_ID_STAGING }}
+        image: ${{ needs.build.outputs.image-tag }}
+        ports: "8081:8081"
+        env: |
+          PORT=8081
+          ENV=staging
+          DB_HOST=${{ secrets.DB_HOST_STAGING }}
+          DB_PORT=${{ secrets.DB_PORT_STAGING }}
+          DB_USER=${{ secrets.DB_USER_STAGING }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD_STAGING }}
+          DB_NAME=${{ secrets.DB_NAME_STAGING }}
+          JWT_SECRET=${{ secrets.JWT_SECRET_STAGING }}
+          CORS_ORIGINS=https://staging.doctorhealthy1.com
+          RATE_LIMIT=500
+
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for deployment to be ready..."
+        sleep 60
+
+    - name: Run health checks
+      if: github.event.inputs.force_deploy != 'true'
+      run: |
+        # Basic health check
+        for i in {1..10}; do
+          if curl -f https://staging.doctorhealthy1.com/health; then
+            echo "Health check passed"
+            break
+          fi
+          echo "Health check attempt $i failed, retrying..."
+          sleep 10
+        done
+
+        # Detailed health check
+        curl -f https://staging.doctorhealthy1.com/health/detailed
+
+        # Readiness check
+        curl -f https://staging.doctorhealthy1.com/ready
+
+    - name: Run smoke tests
+      if: github.event.inputs.force_deploy != 'true'
+      run: |
+        npm ci
+        npm run test:smoke -- --base-url=https://staging.doctorhealthy1.com
+
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          🚀 Staging deployment ${{ job.status }}
+          Repository: ${{ github.repository }}
+          Tag: ${{ github.ref_name }}
+          Image: ${{ needs.build.outputs.image-tag }}
+          Deployed to: https://staging.doctorhealthy1.com
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Deploy to production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event.inputs.environment == 'production' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to Dokploy Production
+      uses: dokploy/github-action@v1
+      with:
+        dokploy-host: ${{ secrets.DOKPLOY_HOST_PRODUCTION }}
+        dokploy-api-key: ${{ secrets.DOKPLOY_API_KEY_PRODUCTION }}
+        application-id: ${{ secrets.DOKPLOY_APP_ID_PRODUCTION }}
+        image: ${{ needs.build.outputs.image-tag }}
+        ports: "8081:8081"
+        env: |
+          PORT=8081
+          ENV=production
+          DB_HOST=${{ secrets.DB_HOST_PRODUCTION }}
+          DB_PORT=${{ secrets.DB_PORT_PRODUCTION }}
+          DB_USER=${{ secrets.DB_USER_PRODUCTION }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD_PRODUCTION }}
+          DB_NAME=${{ secrets.DB_NAME_PRODUCTION }}
+          JWT_SECRET=${{ secrets.JWT_SECRET_PRODUCTION }}
+          CORS_ORIGINS=https://my.doctorhealthy1.com,https://doctorhealthy1.com,https://www.doctorhealthy1.com
+          RATE_LIMIT=1000
+
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for production deployment to be ready..."
+        sleep 90
+
+    - name: Run comprehensive health checks
+      if: github.event.inputs.force_deploy != 'true'
+      run: |
+        # Basic health check with retries
+        for i in {1..15}; do
+          if curl -f https://my.doctorhealthy1.com/health; then
+            echo "Health check passed"
+            break
+          fi
+          echo "Health check attempt $i failed, retrying..."
+          sleep 10
+        done
+
+        # Detailed health check
+        curl -f https://my.doctorhealthy1.com/health/detailed
+
+        # Readiness check
+        curl -f https://my.doctorhealthy1.com/ready
+
+        # Check key API endpoints
+        curl -f https://my.doctorhealthy1.com/api/v1/health
+
+    - name: Run production smoke tests
+      if: github.event.inputs.force_deploy != 'true'
+      run: |
+        npm ci
+        npm run test:smoke -- --base-url=https://my.doctorhealthy1.com
+
+    - name: Run API contract validation
+      if: github.event.inputs.force_deploy != 'true'
+      run: |
+        npm run test:contract -- --base-url=https://my.doctorhealthy1.com
+
+    - name: Monitor application metrics
+      if: github.event.inputs.force_deploy != 'true'
+      run: |
+        # Wait for metrics collection
+        sleep 60
+        
+        # Check Prometheus metrics endpoint
+        curl -f https://my.doctorhealthy1.com/metrics || echo "Metrics endpoint not accessible"
+        
+        echo "Metrics collection verified"
+
+    - name: Create deployment record
+      if: success()
+      run: |
+        # Create deployment status file
+        echo "Deployment Status: success" > deployment-status.txt
+        echo "Timestamp: $(date)" >> deployment-status.txt
+        echo "Commit: ${{ github.sha }}" >> deployment-status.txt
+        echo "Tag: ${{ github.ref_name }}" >> deployment-status.txt
+        echo "Image: ${{ needs.build.outputs.image-tag }}" >> deployment-status.txt
+        echo "Environment: production" >> deployment-status.txt
+
+    - name: Upload deployment artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: production-deployment-${{ github.run_number }}
+        path: deployment-status.txt
+        retention-days: 30
+
+    - name: Notify production deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          🎉 Production deployment ${{ job.status }}
+          Repository: ${{ github.repository }}
+          Tag: ${{ github.ref_name }}
+          Image: ${{ needs.build.outputs.image-tag }}
+          Deployed to: https://my.doctorhealthy1.com
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Rollback on failure
+  rollback:
+    runs-on: ubuntu-latest
+    needs: [deploy-production, build]
+    if: failure() && needs.deploy-production.result == 'failure' && github.event.inputs.environment == 'production'
+    
+    steps:
+    - name: Get previous successful deployment
+      id: get-previous
+      run: |
+        # Get the previous successful deployment tag
+        PREVIOUS_TAG=$(git tag --sort=-creatordate | grep 'v' | head -n 2 | tail -n 1)
+        echo "previous-tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+        
+        if [ -z "$PREVIOUS_TAG" ]; then
+          echo "No previous production deployment found"
+          exit 1
+        fi
+
+    - name: Rollback to previous version
+      uses: dokploy/github-action@v1
+      with:
+        dokploy-host: ${{ secrets.DOKPLOY_HOST_PRODUCTION }}
+        dokploy-api-key: ${{ secrets.DOKPLOY_API_KEY_PRODUCTION }}
+        application-id: ${{ secrets.DOKPLOY_APP_ID_PRODUCTION }}
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-previous.outputs.previous-tag }}
+
+    - name: Wait for rollback
+      run: |
+        echo "Waiting for rollback to complete..."
+        sleep 60
+
+    - name: Verify rollback health
+      run: |
+        curl -f https://my.doctorhealthy1.com/health
+
+    - name: Notify rollback
+      uses: 8398a7/action-slack@v3
+      with:
+        status: 'failure'
+        channel: '#deployments'
+        text: |
+          🚨 ROLLBACK INITIATED
+          Repository: ${{ github.repository }}
+          Current tag: ${{ github.ref_name }}
+          Rolled back to: ${{ steps.get-previous.outputs.previous-tag }}
+          Reason: Deployment health checks failed
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

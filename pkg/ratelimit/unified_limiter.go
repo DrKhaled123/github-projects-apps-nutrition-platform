@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"golang.org/x/time/rate"
 )
 
@@ -19,17 +18,17 @@ type Config struct {
 	BurstSize         int
 
 	// Storage
-	CleanupInterval   time.Duration
-	MaxIdleTime       time.Duration
-	MaxUsers          int
+	CleanupInterval time.Duration
+	MaxIdleTime     time.Duration
+	MaxUsers        int
 
 	// Security
-	EnableHTTPSOnly   bool
-	TrustedProxies    []string
+	EnableHTTPSOnly bool
+	TrustedProxies  []string
 
 	// Monitoring
-	EnableMetrics     bool
-	MetricsCallback   func(event MetricEvent)
+	EnableMetrics   bool
+	MetricsCallback func(event MetricEvent)
 }
 
 // DefaultConfig returns secure defaults
@@ -47,11 +46,11 @@ func DefaultConfig() *Config {
 
 // MetricEvent represents a rate limit event
 type MetricEvent struct {
-	UserID      string
-	Timestamp   time.Time
-	Allowed     bool
-	Remaining   int
-	RetryAfter  time.Duration
+	UserID     string
+	Timestamp  time.Time
+	Allowed    bool
+	Remaining  int
+	RetryAfter time.Duration
 }
 
 // UserLimiter holds rate limiter for a single user
@@ -68,9 +67,9 @@ type UnifiedRateLimiter struct {
 	limiters sync.Map // map[string]*UserLimiter (lock-free)
 
 	// Metrics
-	totalRequests   int64
-	totalBlocked    int64
-	activeUsers     int64
+	totalRequests int64
+	totalBlocked  int64
+	activeUsers   int64
 
 	// Lifecycle
 	ctx    context.Context
@@ -190,6 +189,10 @@ func (rl *UnifiedRateLimiter) startCleanup() {
 	go func() {
 		defer rl.wg.Done()
 
+		// Ensure cleanup interval is positive to avoid ticker panic
+		if rl.config.CleanupInterval <= 0 {
+			rl.config.CleanupInterval = time.Minute
+		}
 		ticker := time.NewTicker(rl.config.CleanupInterval)
 		defer ticker.Stop()
 

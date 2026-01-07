@@ -8,6 +8,7 @@ import (
 
 	"api-key-generator/internal/models"
 	"api-key-generator/internal/utils"
+
 	"github.com/google/uuid"
 )
 

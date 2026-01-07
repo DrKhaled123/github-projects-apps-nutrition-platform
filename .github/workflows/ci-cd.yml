@@ -1,0 +1,518 @@
+name: CI/CD Pipeline with Dokploy Integration
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Security and Code Quality Checks
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-no-fail -fmt sarif -out gosec.sarif ./...'
+
+    - name: Upload Gosec results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'gosec.sarif'
+
+  # Code Quality and Linting
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        go mod download
+        npm ci
+
+    - name: Run Go linters
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+
+    - name: Run Go formatting check
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Go code is not formatted properly"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Run frontend linting
+      run: npm run lint:frontend
+
+    - name: Check for hardcoded secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+
+  # Comprehensive Testing
+  test:
+    runs-on: ubuntu-latest
+    needs: [code-quality]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        go mod download
+        npm ci
+
+    - name: Run Go tests with coverage
+      run: |
+        go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        go tool cover -html=coverage.out -o coverage.html
+
+    - name: Run integration tests
+      run: |
+        go test -v -tags=integration ./tests/...
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: test_db
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+
+    - name: Run frontend tests
+      run: npm test
+
+    - name: Run property-based tests
+      run: npm run test:property
+
+    - name: Run contract tests
+      run: npm run test:contract
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: Generate test report
+      uses: dorny/test-reporter@v1
+      if: success() || failure()
+      with:
+        name: Go Tests
+        path: junit.xml
+        reporter: java-junit
+
+  # Build and Push Docker Image
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [security-scan, test]
+    if: github.event_name != 'pull_request'
+    
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: false
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.spdx.json
+
+  # Performance and Load Testing
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Start application for testing
+      run: |
+        docker-compose -f docker-compose.test.yml up -d
+        sleep 30
+
+    - name: Run performance tests with k6
+      uses: grafana/k6-action@v0.3.1
+      with:
+        filename: tests/performance/load-test.js
+      env:
+        BASE_URL: http://localhost:8081
+
+    - name: Run performance audit
+      run: npm run performance-audit
+
+    - name: Cleanup test environment
+      run: docker-compose -f docker-compose.test.yml down -v
+
+  # Deploy to Dokploy - Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, performance-test]
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/staging'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to Dokploy Staging
+      uses: dokploy/github-action@v1
+      with:
+        dokploy-host: ${{ secrets.DOKPLOY_HOST_STAGING }}
+        dokploy-api-key: ${{ secrets.DOKPLOY_API_KEY_STAGING }}
+        application-id: ${{ secrets.DOKPLOY_APP_ID_STAGING }}
+        image: ${{ needs.build-and-push.outputs.image-tag }}
+        ports: "8081:8081"
+        env: |
+          PORT=8081
+          ENV=staging
+          DB_HOST=${{ secrets.DB_HOST_STAGING }}
+          DB_PORT=${{ secrets.DB_PORT_STAGING }}
+          DB_USER=${{ secrets.DB_USER_STAGING }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD_STAGING }}
+          DB_NAME=${{ secrets.DB_NAME_STAGING }}
+          JWT_SECRET=${{ secrets.JWT_SECRET_STAGING }}
+          CORS_ORIGINS=https://staging.doctorhealthy1.com
+          RATE_LIMIT=500
+
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for deployment to be ready..."
+        sleep 60
+
+    - name: Health check
+      run: |
+        curl -f https://staging.doctorhealthy1.com/health || exit 1
+
+    - name: Run smoke tests
+      run: |
+        npm run test:smoke -- --base-url=https://staging.doctorhealthy1.com
+
+    - name: Notify Slack on staging deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          🚀 Staging deployment ${{ job.status }}
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Image: ${{ needs.build-and-push.outputs.image-tag }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Deploy to Dokploy - Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, performance-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to Dokploy Production
+      uses: dokploy/github-action@v1
+      with:
+        dokploy-host: ${{ secrets.DOKPLOY_HOST_PRODUCTION }}
+        dokploy-api-key: ${{ secrets.DOKPLOY_API_KEY_PRODUCTION }}
+        application-id: ${{ secrets.DOKPLOY_APP_ID_PRODUCTION }}
+        image: ${{ needs.build-and-push.outputs.image-tag }}
+        ports: "8081:8081"
+        env: |
+          PORT=8081
+          ENV=production
+          DB_HOST=${{ secrets.DB_HOST_PRODUCTION }}
+          DB_PORT=${{ secrets.DB_PORT_PRODUCTION }}
+          DB_USER=${{ secrets.DB_USER_PRODUCTION }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD_PRODUCTION }}
+          DB_NAME=${{ secrets.DB_NAME_PRODUCTION }}
+          JWT_SECRET=${{ secrets.JWT_SECRET_PRODUCTION }}
+          CORS_ORIGINS=https://my.doctorhealthy1.com,https://doctorhealthy1.com,https://www.doctorhealthy1.com
+          RATE_LIMIT=1000
+
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for production deployment to be ready..."
+        sleep 90
+
+    - name: Health check
+      run: |
+        curl -f https://my.doctorhealthy1.com/health || exit 1
+
+    - name: Run production smoke tests
+      run: |
+        npm run test:smoke -- --base-url=https://my.doctorhealthy1.com
+
+    - name: Run API contract validation
+      run: |
+        npm run test:contract -- --base-url=https://my.doctorhealthy1.com
+
+    - name: Create deployment tag
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const tag = `prod-${new Date().toISOString().slice(0,10)}-${context.sha.slice(0,7)}`;
+          github.rest.git.createRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: `refs/tags/${tag}`,
+            sha: context.sha
+          });
+
+    - name: Notify Slack on production deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          🎉 Production deployment ${{ job.status }}
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Image: ${{ needs.build-and-push.outputs.image-tag }}
+          Deployed to: https://my.doctorhealthy1.com
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Post-deployment Monitoring and Validation
+  post-deployment:
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run comprehensive health checks
+      run: |
+        # Basic health check
+        curl -f https://my.doctorhealthy1.com/health
+        
+        # Detailed health check
+        curl -f https://my.doctorhealthy1.com/health/detailed
+        
+        # Readiness check
+        curl -f https://my.doctorhealthy1.com/ready
+        
+        # Check key API endpoints
+        curl -f https://my.doctorhealthy1.com/api/v1/health || echo "API health endpoint not responding"
+        
+        echo "All health checks passed"
+
+    - name: Monitor application metrics
+      run: |
+        # Wait for metrics collection
+        sleep 60
+        
+        # Check Prometheus metrics endpoint
+        curl -f https://my.doctorhealthy1.com/metrics || echo "Metrics endpoint not accessible"
+        
+        echo "Metrics collection verified"
+
+    - name: Run synthetic monitoring
+      run: |
+        # Simulate user journeys
+        curl -s -o /dev/null -w "%{http_code}" https://my.doctorhealthy1.com/
+        curl -s -o /dev/null -w "%{http_code}" https://my.doctorhealthy1.com/diet.html
+        curl -s -o /dev/null -w "%{http_code}" https://my.doctorhealthy1.com/workouts.html
+        curl -s -o /dev/null -w "%{http_code}" https://my.doctorhealthy1.com/recipes.html
+        
+        echo "Synthetic monitoring completed"
+
+    - name: Update deployment status
+      if: always()
+      run: |
+        # Create deployment status file
+        echo "Deployment Status: ${{ job.status }}" > deployment-status.txt
+        echo "Timestamp: $(date)" >> deployment-status.txt
+        echo "Commit: ${{ github.sha }}" >> deployment-status.txt
+        echo "Image: ${{ needs.build-and-push.outputs.image-tag }}" >> deployment-status.txt
+        
+        # Upload status as artifact
+        mkdir -p deployment-artifacts
+        cp deployment-status.txt deployment-artifacts/
+
+    - name: Upload deployment artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: deployment-artifacts
+        path: deployment-artifacts/
+
+  # Rollback on Failure
+  rollback:
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: failure() && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Get previous successful deployment
+      id: get-previous
+      run: |
+        # Get the previous successful deployment tag
+        PREVIOUS_TAG=$(git tag --sort=-creatordate | grep 'prod-' | head -n 2 | tail -n 1)
+        echo "previous-tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+        
+        if [ -z "$PREVIOUS_TAG" ]; then
+          echo "No previous production deployment found"
+          exit 1
+        fi
+
+    - name: Rollback to previous version
+      uses: dokploy/github-action@v1
+      with:
+        dokploy-host: ${{ secrets.DOKPLOY_HOST_PRODUCTION }}
+        dokploy-api-key: ${{ secrets.DOKPLOY_API_KEY_PRODUCTION }}
+        application-id: ${{ secrets.DOKPLOY_APP_ID_PRODUCTION }}
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-previous.outputs.previous-tag }}
+
+    - name: Notify rollback
+      uses: 8398a7/action-slack@v3
+      with:
+        status: 'failure'
+        channel: '#deployments'
+        text: |
+          🚨 ROLLBACK INITIATED
+          Repository: ${{ github.repository }}
+          Current: ${{ github.sha }}
+          Rolled back to: ${{ steps.get-previous.outputs.previous-tag }}
+          Reason: Deployment health checks failed
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

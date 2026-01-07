@@ -1,0 +1,252 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Primary Database
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: doctorhealthy-postgres-primary
+    environment:
+      POSTGRES_DB: doctorhealthy
+      POSTGRES_USER: doctorhealthy
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${DB_REPLICATION_PASSWORD}
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./database/schema/postgres_production.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/init/postgres.conf:/etc/postgresql/postgresql.conf
+      - ./database/init/pg_hba.conf:/etc/postgresql/pg_hba.conf
+    ports:
+      - "5432:5432"
+    networks:
+      - doctorhealthy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U doctorhealthy -d doctorhealthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL Replica (Read Replica)
+  postgres-replica:
+    image: postgres:15-alpine
+    container_name: doctorhealthy-postgres-replica
+    environment:
+      POSTGRES_DB: doctorhealthy
+      POSTGRES_USER: doctorhealthy
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGUSER: postgres
+      POSTGRES_PRIMARY_HOST: postgres-primary
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${DB_REPLICATION_PASSWORD}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./database/init/replica-setup.sh:/docker-entrypoint-initdb.d/replica-setup.sh
+    ports:
+      - "5433:5432"
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U doctorhealthy -d doctorhealthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis Cache Cluster
+  redis-master:
+    image: redis:7-alpine
+    container_name: doctorhealthy-redis-master
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis_master_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    networks:
+      - doctorhealthy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  redis-replica:
+    image: redis:7-alpine
+    container_name: doctorhealthy-redis-replica
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass ${REDIS_PASSWORD}
+      --replicaof redis-master 6379
+      --masterauth ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_replica_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Redis Sentinel for High Availability
+  redis-sentinel:
+    image: redis:7-alpine
+    container_name: doctorhealthy-redis-sentinel
+    command: redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+    ports:
+      - "26379:26379"
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      - redis-master
+      - redis-replica
+    restart: unless-stopped
+
+  # pgAdmin for Database Management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: doctorhealthy-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json
+    ports:
+      - "5050:80"
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      - postgres-primary
+    restart: unless-stopped
+
+  # Redis Commander for Redis Management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: doctorhealthy-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis-master:6379:0:${REDIS_PASSWORD},replica:redis-replica:6379:0:${REDIS_PASSWORD}
+      HTTP_USER: ${REDIS_COMMANDER_USER}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD}
+    ports:
+      - "8081:8081"
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      - redis-master
+      - redis-replica
+    restart: unless-stopped
+
+  # Database Backup Service
+  postgres-backup:
+    image: postgres:15-alpine
+    container_name: doctorhealthy-postgres-backup
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+      POSTGRES_HOST: postgres-primary
+      POSTGRES_DB: doctorhealthy
+      POSTGRES_USER: doctorhealthy
+      BACKUP_SCHEDULE: "0 2 * * *"  # Daily at 2 AM
+      RETENTION_DAYS: "30"
+      S3_BUCKET: ${BACKUP_S3_BUCKET}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./scripts/backup.sh:/backup.sh
+      - postgres_backups:/backups
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "
+        apk add --no-cache postgresql-client aws-cli &&
+        chmod +x /backup.sh &&
+        echo '$${BACKUP_SCHEDULE} /backup.sh' > /etc/crontabs/root &&
+        crond -f -l 2
+      "
+
+  # Database Monitoring
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: doctorhealthy-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://doctorhealthy:${DB_PASSWORD}@postgres-primary:5432/doctorhealthy?sslmode=disable"
+    ports:
+      - "9187:9187"
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      - postgres-primary:
+        condition: service_healthy
+    restart: unless-stopped
+    command:
+      - "--extend.query-path=/etc/postgres-exporter/queries.yaml"
+    volumes:
+      - ./monitoring/postgres-queries.yaml:/etc/postgres-exporter/queries.yaml
+
+  # Redis Exporter for Monitoring
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: doctorhealthy-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://redis-master:6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "9121:9121"
+    networks:
+      - doctorhealthy-network
+    depends_on:
+      - redis-master:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_primary_data:
+    driver: local
+  postgres_replica_data:
+    driver: local
+  redis_master_data:
+    driver: local
+  redis_replica_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  postgres_backups:
+    driver: local
+
+networks:
+  doctorhealthy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

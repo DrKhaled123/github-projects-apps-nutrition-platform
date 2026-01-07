@@ -57,7 +57,7 @@ func main() {
 	}
 
 	// Initialize database
-	db, err := database.Initialize(cfg.Database.Path)
+	db, err := database.InitializeConfig(cfg.Database)
 	if err != nil {
 		log.Printf("Failed to initialize database: %v", err)
 		os.Exit(1)

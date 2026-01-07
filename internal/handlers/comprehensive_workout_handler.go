@@ -247,28 +247,74 @@ func (cwh *ComprehensiveWorkoutHandler) generateSupplementRecommendations(goal, 
 		},
 	}
 
+	// Adjust recommendations based on fitness level
+	baseSupps := map[string]interface{}{}
 	if goalSupps, exists := supplements[goal]; exists {
-		return goalSupps
+		baseSupps = goalSupps
+	} else {
+		baseSupps = supplements["muscle_gain"]
 	}
-	return supplements["muscle_gain"]
+
+	// Apply level-based modifications
+	switch level {
+	case "beginner":
+		// Reduce dosages for beginners
+		if protein, ok := baseSupps["protein"].(map[string]string); ok {
+			protein["dosage"] = "20-25g"
+		}
+		if creatine, ok := baseSupps["creatine"].(map[string]string); ok {
+			creatine["dosage"] = "3g"
+		}
+	case "advanced":
+		// Increase dosages for advanced users
+		if protein, ok := baseSupps["protein"].(map[string]string); ok {
+			protein["dosage"] = "35-45g"
+		}
+		if creatine, ok := baseSupps["creatine"].(map[string]string); ok {
+			creatine["dosage"] = "7g"
+		}
+	}
+
+	return baseSupps
 }
 
 func (cwh *ComprehensiveWorkoutHandler) generateTechniqueGuidance(exerciseType, language string) map[string]interface{} {
-	techniques := map[string]map[string]interface{}{
-		"strength": {
-			"form_cues": []string{"Maintain neutral spine", "Control eccentric phase", "Full range of motion", "Breathe properly"},
-			"mistakes":  []string{"Using momentum", "Partial reps", "Poor posture", "Holding breath"},
-			"safety":    []string{"Warm up properly", "Use spotters for heavy lifts", "Progress gradually", "Listen to your body"},
+	// Language-specific technique guidance
+	techniques := map[string]map[string]map[string]interface{}{
+		"en": {
+			"strength": {
+				"form_cues": []string{"Maintain neutral spine", "Control eccentric phase", "Full range of motion", "Breathe properly"},
+				"mistakes":  []string{"Using momentum", "Partial reps", "Poor posture", "Holding breath"},
+				"safety":    []string{"Warm up properly", "Use spotters for heavy lifts", "Progress gradually", "Listen to your body"},
+			},
+			"cardio": {
+				"form_cues": []string{"Maintain upright posture", "Land softly", "Controlled breathing", "Engage core"},
+				"mistakes":  []string{"Overstriding", "Poor posture", "Holding breath", "Too much too soon"},
+				"safety":    []string{"Start gradually", "Stay hydrated", "Monitor heart rate", "Cool down properly"},
+			},
 		},
-		"cardio": {
-			"form_cues": []string{"Maintain upright posture", "Land softly", "Controlled breathing", "Engage core"},
-			"mistakes":  []string{"Overstriding", "Poor posture", "Holding breath", "Too much too soon"},
-			"safety":    []string{"Start gradually", "Stay hydrated", "Monitor heart rate", "Cool down properly"},
+		"es": {
+			"strength": {
+				"form_cues": []string{"Mantén la columna neutral", "Controla la fase excéntrica", "Rango completo de movimiento", "Respira correctamente"},
+				"mistakes":  []string{"Usar momentum", "Repeticiones parciales", "Postura deficiente", "Contener la respiración"},
+				"safety":    []string{"Calienta adecuadamente", "Usa ayudantes para levantamientos pesados", "Progresa gradualmente", "Escucha a tu cuerpo"},
+			},
+			"cardio": {
+				"form_cues": []string{"Mantén postura erguida", "Aterriza suavemente", "Respiración controlada", "Activa el core"},
+				"mistakes":  []string{"Excederse en la zancada", "Postura deficiente", "Contener la respiración", "Demasiado pronto"},
+				"safety":    []string{"Comienza gradualmente", "Mantente hidratado", "Monitorea el ritmo cardíaco", "Enfría adecuadamente"},
+			},
 		},
 	}
 
-	if technique, exists := techniques[exerciseType]; exists {
+	// Default to English if language not supported
+	langTechniques := techniques["en"]
+	if langData, exists := techniques[language]; exists {
+		langTechniques = langData
+	}
+
+	if technique, exists := langTechniques[exerciseType]; exists {
 		return technique
 	}
-	return techniques["strength"]
+	return langTechniques["strength"]
 }

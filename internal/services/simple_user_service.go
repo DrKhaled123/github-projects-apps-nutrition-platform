@@ -129,7 +129,7 @@ func (s *SimpleUserService) ListUsers(ctx context.Context, limit, offset int) ([
 // SimpleMockDatabase provides a mock implementation for testing
 // Simple mock instead of complex mocking framework
 type SimpleMockDatabase struct {
-	users map[int]*SimpleUser
+	users  map[int]*SimpleUser
 	nextID int
 }
 

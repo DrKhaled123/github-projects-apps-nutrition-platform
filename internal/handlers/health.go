@@ -46,8 +46,8 @@ func HealthCheckHandler(db *sql.DB) echo.HandlerFunc {
 			checks["database"] = "healthy"
 		}
 
-		// Check file system permissions with absolute path
-		testFile := "/app/data/health_check.tmp"
+		// Check file system permissions with relative path
+		testFile := "./data/health_check.tmp"
 		if err := os.WriteFile(testFile, []byte("health_check"), 0644); err != nil {
 			checks["filesystem"] = "unhealthy: " + err.Error()
 			overallStatus = "unhealthy"
@@ -107,7 +107,7 @@ func DetailedHealthCheckHandler(db *sql.DB) echo.HandlerFunc {
 		}
 
 		// Check filesystem
-		testFile := "/app/data/health_check.tmp"
+		testFile := "./data/health_check.tmp"
 		if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
 			checks["filesystem"] = "degraded: " + err.Error()
 			if overallStatus == "healthy" {
@@ -136,7 +136,7 @@ func DetailedHealthCheckHandler(db *sql.DB) echo.HandlerFunc {
 			}
 		}
 
-		// Check enhanced health data files
+		// Check enhanced health data files (optional - don't degrade overall status)
 		enhancedFiles := []string{"enhanced-health-data.json", "data/enhanced-health-data.json"}
 		enhancedFound := false
 		for _, file := range enhancedFiles {
@@ -148,13 +148,10 @@ func DetailedHealthCheckHandler(db *sql.DB) echo.HandlerFunc {
 		if enhancedFound {
 			checks["enhanced_health"] = "healthy"
 		} else {
-			checks["enhanced_health"] = "degraded: data files not found"
-			if overallStatus == "healthy" {
-				overallStatus = "degraded"
-			}
+			checks["enhanced_health"] = "info: data files not found (optional feature)"
 		}
 
-		// Check comprehensive data
+		// Check comprehensive data (optional - don't degrade overall status)
 		comprehensiveFiles := []string{"comprehensive-health-data.json", "data/comprehensive-health-data.json"}
 		comprehensiveFound := false
 		for _, file := range comprehensiveFiles {
@@ -166,10 +163,7 @@ func DetailedHealthCheckHandler(db *sql.DB) echo.HandlerFunc {
 		if comprehensiveFound {
 			checks["comprehensive_data"] = "healthy"
 		} else {
-			checks["comprehensive_data"] = "degraded: data files not found"
-			if overallStatus == "healthy" {
-				overallStatus = "degraded"
-			}
+			checks["comprehensive_data"] = "info: data files not found (optional feature)"
 		}
 
 		// Check data directory

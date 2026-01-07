@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - ENV=test
+      - DB_PATH=/app/data/test.db
+      - JWT_SECRET=test_jwt_secret_key_for_ci_cd
+      - CORS_ORIGINS=http://localhost:8081,http://localhost:3000
+      - RATE_LIMIT=100
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Performance testing service
+  k6:
+    image: grafana/k6:latest
+    volumes:
+      - ./tests/performance:/tests
+    environment:
+      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+    command: run /tests/load-test.js
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - performance
+
+  # Test database migrations
+  migrate:
+    build: .
+    command: ["./main", "migrate"]
+    environment:
+      - ENV=test
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=test_user
+      - DB_PASSWORD=test_password
+      - DB_NAME=test_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - migrate
+
+  # Health check validator
+  health-validator:
+    image: curlimages/curl:latest
+    command: >
+      sh -c "
+        echo 'Waiting for application to be ready...';
+        for i in $$(seq 1 30); do
+          if curl -f http://app:8081/health; then
+            echo 'Application is ready';
+            exit 0;
+          fi;
+          echo 'Attempt $$i: Application not ready, waiting...';
+          sleep 2;
+        done;
+        echo 'Application failed to become ready';
+        exit 1;
+      "
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - validation
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  postgres_test_data:
+  redis_test_data:

@@ -1,0 +1,166 @@
+# Backup Configuration for Dokploy
+# This file defines backup schedules and destinations for all services
+
+backups:
+  # Database Backups
+  databases:
+    postgres:
+      enabled: true
+      schedule: "0 2 * * *"  # Daily at 2 AM
+      retention_days: 30
+      compression: true
+      destinations:
+        - type: local
+          path: "/var/lib/dokploy/backups/postgres"
+        - type: s3
+          bucket: "${AWS_BACKUP_BUCKET}"
+          path: "dokploy/postgres"
+          access_key: "${AWS_ACCESS_KEY_ID}"
+          secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          region: "${AWS_REGION}"
+    
+    mysql:
+      enabled: true
+      schedule: "0 2:30 * * *"  # Daily at 2:30 AM
+      retention_days: 30
+      compression: true
+      destinations:
+        - type: local
+          path: "/var/lib/dokploy/backups/mysql"
+        - type: s3
+          bucket: "${AWS_BACKUP_BUCKET}"
+          path: "dokploy/mysql"
+          access_key: "${AWS_ACCESS_KEY_ID}"
+          secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          region: "${AWS_REGION}"
+    
+    mongodb:
+      enabled: true
+      schedule: "0 3 * * *"  # Daily at 3 AM
+      retention_days: 30
+      compression: true
+      destinations:
+        - type: local
+          path: "/var/lib/dokploy/backups/mongodb"
+        - type: s3
+          bucket: "${AWS_BACKUP_BUCKET}"
+          path: "dokploy/mongodb"
+          access_key: "${AWS_ACCESS_KEY_ID}"
+          secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          region: "${AWS_REGION}"
+    
+    mariadb:
+      enabled: true
+      schedule: "0 3:30 * * *"  # Daily at 3:30 AM
+      retention_days: 30
+      compression: true
+      destinations:
+        - type: local
+          path: "/var/lib/dokploy/backups/mariadb"
+        - type: s3
+          bucket: "${AWS_BACKUP_BUCKET}"
+          path: "dokploy/mariadb"
+          access_key: "${AWS_ACCESS_KEY_ID}"
+          secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          region: "${AWS_REGION}"
+    
+    redis:
+      enabled: true
+      schedule: "0 4 * * *"  # Daily at 4 AM
+      retention_days: 7
+      compression: true
+      destinations:
+        - type: local
+          path: "/var/lib/dokploy/backups/redis"
+        - type: s3
+          bucket: "${AWS_BACKUP_BUCKET}"
+          path: "dokploy/redis"
+          access_key: "${AWS_ACCESS_KEY_ID}"
+          secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          region: "${AWS_REGION}"
+
+  # Application Data Backups
+  application_data:
+    dokploy:
+      enabled: true
+      schedule: "0 1 * * *"  # Daily at 1 AM
+      retention_days: 30
+      sources:
+        - "/var/lib/dokploy"
+      destinations:
+        - type: local
+          path: "/var/lib/dokploy/backups/application"
+        - type: s3
+          bucket: "${AWS_BACKUP_BUCKET}"
+          path: "dokploy/application"
+          access_key: "${AWS_ACCESS_KEY_ID}"
+          secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          region: "${AWS_REGION}"
+    
+    monitoring:
+      enabled: true
+      schedule: "0 5 * * 0"  # Weekly on Sunday at 5 AM
+      retention_days: 90
+      sources:
+        - "/var/lib/grafana"
+        - "/prometheus"
+        - "/alertmanager"
+      destinations:
+        - type: local
+          path: "/var/lib/dokploy/backups/monitoring"
+        - type: s3
+          bucket: "${AWS_BACKUP_BUCKET}"
+          path: "dokploy/monitoring"
+          access_key: "${AWS_ACCESS_KEY_ID}"
+          secret_key: "${AWS_SECRET_ACCESS_KEY}"
+          region: "${AWS_REGION}"
+
+  # SSL Certificates Backup
+  ssl_certificates:
+    enabled: true
+    schedule: "0 6 * * 0"  # Weekly on Sunday at 6 AM
+    retention_days: 365
+    sources:
+      - "/etc/ssl/certs"
+      - "/letsencrypt"
+    destinations:
+      - type: local
+        path: "/var/lib/dokploy/backups/ssl"
+      - type: s3
+        bucket: "${AWS_BACKUP_BUCKET}"
+        path: "dokploy/ssl"
+        access_key: "${AWS_ACCESS_KEY_ID}"
+        secret_key: "${AWS_SECRET_ACCESS_KEY}"
+        region: "${AWS_REGION}"
+
+# Backup Settings
+settings:
+  compression:
+    enabled: true
+    format: "gzip"
+    level: 6
+  
+  encryption:
+    enabled: false
+    algorithm: "AES-256"
+    key: "${ENCRYPTION_KEY}"
+  
+  notifications:
+    enabled: true
+    on_success: false
+    on_failure: true
+    webhook_url: "http://dokploy-main:3000/api/trpc/notification.receiveNotification"
+    email:
+      smtp_host: "localhost"
+      smtp_port: 587
+      username: ""
+      password: ""
+      from: "backups@your-domain.com"
+      to: ["admin@your-domain.com"]
+  
+  logging:
+    enabled: true
+    level: "INFO"
+    file: "/var/log/dokploy-backups.log"
+    max_size: "100MB"
+    max_files: 10

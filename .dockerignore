@@ -1,16 +1,103 @@
-node_modules
-vendor
+# Git
 .git
 .gitignore
-.DS_Store
-*.log
-bin
-dist
-build
-*.sqlite
-*.db
-*.sqlite3
-**/tmp
-**/.cache
 
-# Last rebuild: 1759252953
+# Documentation
+README.md
+*.md
+docs/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+build/
+dist/
+
+# Test files
+*_test.go
+test/
+tests/
+coverage.out
+coverage.html
+*.test
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Monitoring and metrics data
+prometheus_data/
+grafana_data/
+alertmanager_data/
+
+# Database files (keep structure, not data)
+data/*.db
+data/*.sqlite
+
+# Deployment scripts
+deploy*.sh
+configure*.sh
+
+# CI/CD
+.github/
+.github/workflows/
+
+# Local development
+docker-compose.override.yml
+docker-compose.dev.yml
+
+# Package managers
+go.sum
+package-lock.json
+pnpm-lock.yaml
+
+# Cache
+.cache/
+.npm/
+
+# Build tools
+Makefile
+Gopkg.toml
+Gopkg.lock

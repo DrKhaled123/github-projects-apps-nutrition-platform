@@ -1,0 +1,134 @@
+{
+  "timestamp": "2025-10-14T03:34:04.407747",
+  "summary": {
+    "critical": 1,
+    "high": 2,
+    "medium": 12,
+    "low": 2,
+    "total": 17
+  },
+  "security_issues": [
+    {
+      "file": "internal/handlers/ultimate_data_handler.go",
+      "line": 452,
+      "issue": "Non-parameterized query",
+      "severity": "MEDIUM",
+      "type": "sql_injection"
+    },
+    {
+      "file": "internal/handlers/ultimate_data_handler.go",
+      "line": 543,
+      "issue": "Non-parameterized query",
+      "severity": "MEDIUM",
+      "type": "sql_injection"
+    },
+    {
+      "file": "internal/handlers/ultimate_data_handler.go",
+      "line": 587,
+      "issue": "Non-parameterized query",
+      "severity": "MEDIUM",
+      "type": "sql_injection"
+    },
+    {
+      "file": "internal/middleware/rate_limit.go",
+      "issue": "Missing per-user rate limiting",
+      "severity": "MEDIUM",
+      "type": "rate_limiting"
+    }
+  ],
+  "health_issues": [],
+  "logging_issues": [
+    {
+      "file": "main.go",
+      "line": 43,
+      "issue": "Abrupt termination",
+      "severity": "LOW",
+      "code": "log.Fatalf(\"Configuration error: %v\", err)"
+    },
+    {
+      "file": "main.go",
+      "line": 48,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"[DEBUG] Server Port: %s\", cfg.Server.Port)"
+    },
+    {
+      "file": "main.go",
+      "line": 49,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"[DEBUG] Database Path: %s\", cfg.Database.Path)"
+    },
+    {
+      "file": "main.go",
+      "line": 50,
+      "issue": "JWT secret in logs",
+      "severity": "CRITICAL",
+      "code": "log.Printf(\"[DEBUG] JWT Secret present: %t\", os.Getenv(\"JWT_SECRET\") != \"\")"
+    },
+    {
+      "file": "main.go",
+      "line": 50,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"[DEBUG] JWT Secret present: %t\", os.Getenv(\"JWT_SECRET\") != \"\")"
+    },
+    {
+      "file": "main.go",
+      "line": 51,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"[DEBUG] CORS Origins: %s\", os.Getenv(\"CORS_ORIGINS\"))"
+    },
+    {
+      "file": "main.go",
+      "line": 52,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"[DEBUG] Log Level: %s\", cfg.Logging.Level)"
+    },
+    {
+      "file": "main.go",
+      "line": 70,
+      "issue": "Abrupt termination",
+      "severity": "LOW",
+      "code": "log.Fatalf(\"Failed to initialize API key service: %v\", err)"
+    },
+    {
+      "file": "main.go",
+      "line": 74,
+      "issue": "API key in logs",
+      "severity": "HIGH",
+      "code": "log.Printf(\"Error closing API key service: %v\", err)"
+    },
+    {
+      "file": "main.go",
+      "line": 256,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"[DEBUG] Attempting to start server on port %s\", cfg.Server.Port)"
+    },
+    {
+      "file": "main.go",
+      "line": 264,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"[DEBUG] Server start error: %v\", err)"
+    },
+    {
+      "file": "main.go",
+      "line": 271,
+      "issue": "API key in logs",
+      "severity": "HIGH",
+      "code": "log.Printf(\"\ud83d\udcca Available features: API Keys, Nutrition Plans, Workout Plans, Health Management, Recipes, Ultimate Comprehensive Database, Sets/Reps Management, Warmup/Technique System, Comprehensive Workout System, Enhanced Health System\")"
+    },
+    {
+      "file": "internal/middleware/error_handler.go",
+      "line": 89,
+      "issue": "Debug logs in production",
+      "severity": "MEDIUM",
+      "code": "log.Printf(\"PANIC RECOVERED [%s]: %v\\nStack: %s\", traceID, r, debug.Stack())"
+    }
+  ],
+  "integration_issues": []
+}

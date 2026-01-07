@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -17,10 +16,10 @@ type CookieConfig struct {
 	Domain     string
 	Path       string
 	MaxAge     int
-	Secure     bool  // Only send over HTTPS
-	HttpOnly   bool  // Prevent JS access
+	Secure     bool // Only send over HTTPS
+	HttpOnly   bool // Prevent JS access
 	SameSite   http.SameSite
-	AutoDetect bool  // Auto-detect HTTPS
+	AutoDetect bool // Auto-detect HTTPS
 }
 
 // DefaultCookieConfig returns secure defaults

@@ -1,0 +1,112 @@
+{
+  "name": "doctorhealthy1-fullstack",
+  "description": "DoctorHealthy1 Nutrition Platform - Full Stack Application",
+  "domains": [
+    {
+      "name": "super.doctorhealthy1.com",
+      "type": "frontend"
+    },
+    {
+      "name": "api.doctorhealthy1.com",
+      "type": "backend"
+    },
+    {
+      "name": "test.doctorhealthy1.com",
+      "type": "monitoring"
+    }
+  ],
+  "environment": {
+    "type": "production",
+    "monitoring": true,
+    "backups": true,
+    "ssl": true,
+    "security": {
+      "firewall": true,
+      "fail2ban": true,
+      "auditd": true
+    }
+  },
+  "services": [
+    {
+      "name": "frontend",
+      "type": "static",
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile.frontend"
+      },
+      "environment": {
+        "API_URL": "http://backend:8081"
+      },
+      "domains": ["super.doctorhealthy1.com"],
+      "healthcheck": "/health.html",
+      "nginx": {
+        "config": "nginx.conf",
+        "cache": true,
+        "compression": true,
+        "pwa": true
+      }
+    },
+    {
+      "name": "backend",
+      "type": "application",
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "environment": {
+        "PORT": "8081",
+        "ENV": "production",
+        "GIN_MODE": "release",
+        "LOG_LEVEL": "info"
+      },
+      "domains": ["api.doctorhealthy1.com"],
+      "healthcheck": "/health",
+      "port": "8081",
+      "nginx": {
+        "proxy": true,
+        "websocket": false,
+        "ssl": true
+      }
+    },
+    {
+      "name": "monitoring",
+      "type": "docker",
+      "image": "prom/prometheus:latest",
+      "environment": {},
+      "domains": ["test.doctorhealthy1.com"],
+      "port": "9090"
+    }
+  ],
+  "databases": [
+    {
+      "name": "main",
+      "type": "sqlite",
+      "version": "latest",
+      "persistent": true
+    }
+  ],
+  "networks": [
+    {
+      "name": "doctorhealthy1-network",
+      "driver": "bridge",
+      "internal": false
+    }
+  ],
+  "volumes": [
+    {
+      "name": "database",
+      "driver": "local",
+      "backup": true
+    },
+    {
+      "name": "backups",
+      "driver": "local"
+    }
+  ],
+  "deployment": {
+    "strategy": "rolling",
+    "healthcheck_timeout": 60,
+    "restart_policy": "unless-stopped",
+    "rollback": true
+  }
+}

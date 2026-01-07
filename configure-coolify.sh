@@ -28,8 +28,13 @@ print_header() {
 # Configuration - USE YOUR ACCESS TOKEN
 COOLIFY_HOST="128.140.111.171"
 COOLIFY_PORT="8000"
-COOLIFY_TOKEN="4|jdTX2lUb2q6IOrwNGkHyQBCO74JJeeRHZVvFNwgI6b376a50"
-APP_UUID="hcw0gc8wcwk440gw4c88408o"
+COOLIFY_TOKEN="${COOLIFY_API_TOKEN:-${COOLIFY_TOKEN:-}}"
+APP_UUID="${COOLIFY_APP_UUID:-hcw0gc8wcwk440gw4c88408o}"
+
+if [ -z "$COOLIFY_TOKEN" ]; then
+    print_error "Coolify API token not provided. Set COOLIFY_API_TOKEN environment variable."
+    exit 1
+fi
 
 # Domains
 API_DOMAIN="api.doctorhealthy1.com"

@@ -1,0 +1,311 @@
+# Prometheus Alerting Rules for DoctorHealthy Platform
+# HIPAA-Compliant Health Application Monitoring
+
+groups:
+  # Application Health Alerts
+  - name: doctorhealthy.application
+    rules:
+      - alert: ApplicationDown
+        expr: up{job="doctorhealthy-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: doctorhealthy
+          team: platform
+        annotations:
+          summary: "DoctorHealthy application is down"
+          description: "DoctorHealthy application has been down for more than 1 minute on {{ $labels.instance }}"
+          runbook_url: "https://runbooks.doctorhealthy.com/application-down"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: doctorhealthy
+          team: platform
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: doctorhealthy
+          team: platform
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s on {{ $labels.instance }}"
+
+      - alert: LowRequestRate
+        expr: rate(http_requests_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: doctorhealthy
+          team: platform
+        annotations:
+          summary: "Low request rate detected"
+          description: "Request rate is {{ $value }} req/s on {{ $labels.instance }}"
+
+  # Database Health Alerts
+  - name: doctorhealthy.database
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+          team: platform
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database is not responding on {{ $labels.instance }}"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+          team: platform
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "PostgreSQL connection usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_statements_mean_time_seconds[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+          team: platform
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Average query time is {{ $value }}s on {{ $labels.instance }}"
+
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag_seconds > 30
+        for: 2m
+        labels:
+          severity: warning
+          service: postgresql
+          team: platform
+        annotations:
+          summary: "PostgreSQL replication lag"
+          description: "Replication lag is {{ $value }}s on {{ $labels.instance }}"
+
+  # Redis Health Alerts
+  - name: doctorhealthy.redis
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+          team: platform
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache is not responding on {{ $labels.instance }}"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+          team: platform
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: RedisHighConnectionUsage
+        expr: redis_connected_clients > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+          team: platform
+        annotations:
+          summary: "Redis high connection count"
+          description: "Redis has {{ $value }} connected clients on {{ $labels.instance }}"
+
+      - alert: RedisLowHitRate
+        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) < 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: redis
+          team: platform
+        annotations:
+          summary: "Redis low cache hit rate"
+          description: "Redis cache hit rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+  # System Resource Alerts
+  - name: doctorhealthy.system
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+          team: platform
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+          team: platform
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+          team: platform
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value }}% available on {{ $labels.instance }}"
+
+      - alert: HighDiskIO
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+          team: platform
+        annotations:
+          summary: "High disk I/O"
+          description: "Disk I/O utilization is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+  # Security Alerts
+  - name: doctorhealthy.security
+    rules:
+      - alert: SuspiciousLoginActivity
+        expr: rate(auth_login_attempts_total{status="failed"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+          team: security
+        annotations:
+          summary: "Suspicious login activity detected"
+          description: "High rate of failed login attempts: {{ $value }} attempts/min"
+
+      - alert: HighRateLimitViolations
+        expr: rate(rate_limit_violations_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: security
+          team: security
+        annotations:
+          summary: "High rate limit violations"
+          description: "Rate limit violations are {{ $value }} per minute"
+
+      - alert: UnauthorizedAPIAccess
+        expr: rate(api_requests_total{status="401"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+          team: security
+        annotations:
+          summary: "Unauthorized API access attempts"
+          description: "Unauthorized API access attempts: {{ $value }} per minute"
+
+  # Business Metrics Alerts
+  - name: doctorhealthy.business
+    rules:
+      - alert: LowUserActivity
+        expr: rate(active_users_total[1h]) < 10
+        for: 30m
+        labels:
+          severity: warning
+          service: business
+          team: product
+        annotations:
+          summary: "Low user activity"
+          description: "User activity rate is {{ $value }} users/hour"
+
+      - alert: LowAPIKeyUsage
+        expr: rate(api_key_usage_total[1h]) < 50
+        for: 1h
+        labels:
+          severity: warning
+          service: business
+          team: product
+        annotations:
+          summary: "Low API key usage"
+          description: "API key usage rate is {{ $value }} calls/hour"
+
+      - alert: HighErrorRateInHealthPlans
+        expr: rate(health_plan_generation_errors_total[5m]) / rate(health_plan_generations_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: business
+          team: product
+        annotations:
+          summary: "High error rate in health plan generation"
+          description: "Health plan generation error rate is {{ $value | humanizePercentage }}"
+
+  # HIPAA Compliance Alerts
+  - name: doctorhealthy.hipaa
+    rules:
+      - alert: AuditLogFailure
+        expr: rate(audit_log_write_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: hipaa
+          team: compliance
+        annotations:
+          summary: "Audit log write failure"
+          description: "Failed to write audit logs at rate {{ $value }} per minute"
+
+      - alert: DataAccessWithoutAudit
+        expr: rate(data_access_without_audit_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: hipaa
+          team: compliance
+        annotations:
+          summary: "Data access without audit logging"
+          description: "Data access without proper audit logging: {{ $value }} per minute"
+
+      - alert: UnauthorizedPHIAccess
+        expr: rate(unauthorized_phi_access_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: hipaa
+          team: compliance
+        annotations:
+          summary: "Unauthorized PHI access attempt"
+          description: "Unauthorized PHI access attempts: {{ $value }} per minute"
+
+      - alert: EncryptionKeyExpiration
+        expr: time_until_encryption_key_expiration_seconds < 86400 * 7  # 7 days
+        for: 1h
+        labels:
+          severity: warning
+          service: hipaa
+          team: compliance
+        annotations:
+          summary: "Encryption key expiring soon"
+          description: "Encryption key will expire in {{ $value | humanizeDuration }}"

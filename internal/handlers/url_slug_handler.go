@@ -26,10 +26,10 @@ func NewURLSlugHandler(apiKeyService *services.APIKeyService) *URLSlugHandler {
 func (h *URLSlugHandler) GenerateEnterpriseTrialURL(c echo.Context) error {
 	// Bind request
 	var req struct {
-		Domain     string `json:"domain" validate:"required"`
-		Company    string `json:"company" validate:"required"`
-		PlanType   string `json:"plan_type"`
-		APIKey     string `json:"api_key"`
+		Domain   string `json:"domain" validate:"required"`
+		Company  string `json:"company" validate:"required"`
+		PlanType string `json:"plan_type"`
+		APIKey   string `json:"api_key"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -59,11 +59,11 @@ func (h *URLSlugHandler) GenerateEnterpriseTrialURL(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"url":         url,
-		"domain":      req.Domain,
-		"company":     req.Company,
-		"plan_type":   req.PlanType,
-		"slug":        extractSlugFromURL(url),
+		"url":          url,
+		"domain":       req.Domain,
+		"company":      req.Company,
+		"plan_type":    req.PlanType,
+		"slug":         extractSlugFromURL(url),
 		"api_key_used": req.APIKey != "",
 	})
 }
@@ -72,9 +72,9 @@ func (h *URLSlugHandler) GenerateEnterpriseTrialURL(c echo.Context) error {
 func (h *URLSlugHandler) GenerateCustomTrialURL(c echo.Context) error {
 	// Bind request
 	var req struct {
-		Domain  string            `json:"domain" validate:"required"`
-		Params  map[string]string `json:"params" validate:"required"`
-		APIKey  string            `json:"api_key"`
+		Domain string            `json:"domain" validate:"required"`
+		Params map[string]string `json:"params" validate:"required"`
+		APIKey string            `json:"api_key"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -104,9 +104,9 @@ func (h *URLSlugHandler) GenerateCustomTrialURL(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"url":         url,
-		"domain":      req.Domain,
-		"params":      req.Params,
+		"url":          url,
+		"domain":       req.Domain,
+		"params":       req.Params,
 		"api_key_used": req.APIKey != "",
 	})
 }

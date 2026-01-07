@@ -28,8 +28,55 @@ type APIKeyService struct {
 	validateKeyStmt *sql.Stmt
 }
 
+// ensureAPIKeyTables creates required tables if they do not exist (useful for tests and first run on SQLite)
+func ensureAPIKeyTables(db *sql.DB) error {
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS api_keys (
+			id TEXT PRIMARY KEY,
+			key TEXT UNIQUE NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT,
+			permissions TEXT NOT NULL,
+			is_active BOOLEAN NOT NULL DEFAULT 1,
+			expires_at DATETIME,
+			last_used_at DATETIME,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			usage_count INTEGER NOT NULL DEFAULT 0,
+			rate_limit INTEGER,
+			rate_limit_used INTEGER NOT NULL DEFAULT 0
+		);`,
+		`CREATE TABLE IF NOT EXISTS api_key_usage (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			api_key_id TEXT NOT NULL,
+			endpoint TEXT NOT NULL,
+			method TEXT NOT NULL,
+			status INTEGER NOT NULL,
+			timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ip_address TEXT,
+			user_agent TEXT,
+			FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE CASCADE
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(key);`,
+		`CREATE INDEX IF NOT EXISTS idx_api_keys_is_active ON api_keys(is_active);`,
+		`CREATE INDEX IF NOT EXISTS idx_usage_api_key_id ON api_key_usage(api_key_id);`,
+	}
+	for _, q := range queries {
+		if _, err := db.Exec(q); err != nil {
+			return fmt.Errorf("failed to ensure api key tables: %w", err)
+		}
+	}
+	return nil
+}
+
+
 // NewAPIKeyService creates a new API key service with prepared statements
 func NewAPIKeyService(db *sql.DB, cfg *config.Config) (*APIKeyService, error) {
+	// Ensure tables exist (especially in tests or fresh SQLite)
+	if err := ensureAPIKeyTables(db); err != nil {
+		return nil, err
+	}
+
 	s := &APIKeyService{
 		db:  db,
 		cfg: cfg,

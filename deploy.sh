@@ -10,7 +10,7 @@ echo "🚀 Starting DoctorHealthy1 API deployment to Coolify..."
 # Configuration
 COOLIFY_HOST="128.140.111.171"
 COOLIFY_PORT="8000"
-COOLIFY_TOKEN="1|85Vvv1XWokV8ZvBJSvP1hAKzvN2usT29g8LdYshp1e95c717"
+COOLIFY_TOKEN="${COOLIFY_API_TOKEN:-}"
 APP_UUID="hcw0gc8wcwk440gw4c88408o"
 
 # Colors for output

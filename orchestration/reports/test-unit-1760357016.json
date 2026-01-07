@@ -1,0 +1,8 @@
+{
+  "framework": "go",
+  "test_type": "unit",
+  "success": false,
+  "output": "FAIL\ttests/unit [setup failed]\nFAIL\n",
+  "errors": "# tests/unit\npackage tests/unit is not in std (/usr/local/go/src/tests/unit)\n",
+  "timestamp": "2025-10-13T12:03:36.386689"
+}

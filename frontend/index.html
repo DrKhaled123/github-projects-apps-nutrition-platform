@@ -4,10 +4,32 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DoctorHealthy1</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/frontend/manifest.json">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DoctorHealthy1">
+
+  <!-- Performance optimizations -->
+  <link rel="preload" href="/frontend/css/styles.css?v=1.0.1" as="style">
+  <link rel="preload" href="/frontend/js/app.js?v=1.0.1" as="script">
+
+  <!-- Stylesheets -->
   <link rel="stylesheet" href="/frontend/css/styles.css?v=1.0.1" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+  <!-- Favicon and icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/frontend/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/frontend/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/frontend/icons/apple-touch-icon.png">
+
+  <!-- DNS prefetch for API calls -->
+  <link rel="dns-prefetch" href="//api.doctorhealthy1.com">
+  <link rel="dns-prefetch" href="//super.doctorhealthy1.com">
 </head>
 <body>
   <header class="topbar">
@@ -86,6 +108,21 @@
       <span>© <span id="year"></span> DoctorHealthy1</span>
     </div>
   </footer>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/frontend/sw.js?v=1.0.1')
+          .then(function(registration) {
+            console.log('SW registered: ', registration);
+          })
+          .catch(function(registrationError) {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+  </script>
 
   <script src="/frontend/js/app.js?v=1.0.1"></script>
 </body>

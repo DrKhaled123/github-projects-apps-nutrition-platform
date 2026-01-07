@@ -8,8 +8,17 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// Limiter interface defines the methods required for rate limiting
+// LimiterHeaders is a narrow interface implemented by MemoryLimiter for header helpers
+// Note: This is distinct from the broader Limiter interface in limiter.go
+// to avoid redeclaration conflicts.
+type LimiterHeaders interface {
+	ResetTime(key string) time.Time
+	Remaining(key string) int
+}
+
 // SetRateLimitHeaders sets standardized rate limit headers on the response
-func SetRateLimitHeaders(c echo.Context, limiter Limiter, key string, burst int) {
+func SetRateLimitHeaders(c echo.Context, limiter LimiterHeaders, key string, burst int) {
 	resetTime := limiter.ResetTime(key)
 	remaining := limiter.Remaining(key)
 
@@ -29,7 +38,7 @@ func SetRateLimitHeaders(c echo.Context, limiter Limiter, key string, burst int)
 }
 
 // SetRateLimitHeadersForBlocked sets headers when a request is blocked
-func SetRateLimitHeadersForBlocked(c echo.Context, limiter Limiter, key string, burst int) {
+func SetRateLimitHeadersForBlocked(c echo.Context, limiter LimiterHeaders, key string, burst int) {
 	resetTime := limiter.ResetTime(key)
 
 	// Set standard headers for blocked requests

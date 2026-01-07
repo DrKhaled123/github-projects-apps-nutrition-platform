@@ -1,0 +1,74 @@
+{
+    "version": "1.0.0",
+    "pipeline": {
+        "name": "Fast Deployment Pipeline",
+        "stages": [
+            "build",
+            "deploy"
+        ],
+        "fail_fast": false,
+        "parallel_execution": false
+    },
+    "testing": {
+        "enabled": false
+    },
+    "review": {
+        "enabled": false
+    },
+    "build": {
+        "enabled": true,
+        "docker": {
+            "file": "Dockerfile",
+            "context": ".",
+            "platform": "linux/amd64",
+            "cache": true,
+            "multi_stage": true
+        },
+        "optimization": {
+            "enabled": true,
+            "minimize_layers": true
+        },
+        "tagging": {
+            "strategy": "simple",
+            "tags": [
+                "latest"
+            ]
+        },
+        "registry": {
+            "type": "docker_hub",
+            "url": "registry.hub.docker.com",
+            "username": "${DOCKER_USERNAME}",
+            "password": "${DOCKER_PASSWORD}",
+            "repository": "your-org/your-app"
+        },
+        "scan": {
+            "enabled": false
+        }
+    },
+    "deploy": {
+        "enabled": true,
+        "coolify": {
+            "api_url": "${COOLIFY_API_URL}",
+            "api_token": "${COOLIFY_API_TOKEN}",
+            "application_id": "${COOLIFY_APP_ID}",
+            "environment": "production"
+        },
+        "health_check": {
+            "enabled": true,
+            "endpoint": "/health",
+            "expected_status": 200,
+            "timeout_seconds": 10,
+            "retries": 3
+        },
+        "rollback": {
+            "enabled": true,
+            "auto_rollback_on_failure": false
+        }
+    },
+    "shared_memory": {
+        "enabled": false
+    },
+    "logging": {
+        "level": "INFO"
+    }
+}

@@ -1,7 +1,6 @@
 package rate
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -68,7 +67,7 @@ func (ml *MemoryLimiter) Allow(key string) bool {
 
 // ResetTime returns the reset time for the given key (simplified)
 func (ml *MemoryLimiter) ResetTime(key string) time.Time {
-	limiter := ml.GetLimiter(key)
+	_ = ml.GetLimiter(key) // Track last seen time
 	// Calculate reset time based on token regeneration
 	// This is an approximation - in production you might want to track exact reset times
 	return time.Now().Add(time.Minute)

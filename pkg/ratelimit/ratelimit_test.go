@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,12 +15,12 @@ import (
 
 func TestUnifiedRateLimiter(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         *Config
-		requests       int
-		userID         string
-		expectBlocked  int
-		expectHeaders  bool
+		name          string
+		config        *Config
+		requests      int
+		userID        string
+		expectBlocked int
+		expectHeaders bool
 	}{
 		{
 			name: "Allow within limit",

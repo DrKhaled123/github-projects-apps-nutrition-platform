@@ -12,14 +12,14 @@ import (
 // SimpleMonitor provides basic monitoring capabilities
 // Q30S Approach: Start with simple logging instead of complex monitoring stack
 type SimpleMonitor struct {
-	logger *log.Logger
+	logger    *log.Logger
 	startTime time.Time
 }
 
 // NewSimpleMonitor creates a new simple monitor
 func NewSimpleMonitor() *SimpleMonitor {
 	return &SimpleMonitor{
-		logger: log.New(os.Stdout, "[MONITOR] ", log.LstdFlags),
+		logger:    log.New(os.Stdout, "[MONITOR] ", log.LstdFlags),
 		startTime: time.Now(),
 	}
 }
@@ -46,12 +46,12 @@ func (m *SimpleMonitor) GetSystemInfo() map[string]interface{} {
 	runtime.ReadMemStats(&memStats)
 
 	return map[string]interface{}{
-		"uptime":         time.Since(m.startTime).String(),
-		"goroutines":     runtime.NumGoroutine(),
-		"memory_alloc":   fmt.Sprintf("%d KB", memStats.Alloc/1024),
-		"memory_total":   fmt.Sprintf("%d KB", memStats.TotalAlloc/1024),
-		"memory_system":  fmt.Sprintf("%d KB", memStats.Sys/1024),
-		"gc_count":       memStats.NumGC,
+		"uptime":        time.Since(m.startTime).String(),
+		"goroutines":    runtime.NumGoroutine(),
+		"memory_alloc":  fmt.Sprintf("%d KB", memStats.Alloc/1024),
+		"memory_total":  fmt.Sprintf("%d KB", memStats.TotalAlloc/1024),
+		"memory_system": fmt.Sprintf("%d KB", memStats.Sys/1024),
+		"gc_count":      memStats.NumGC,
 	}
 }
 

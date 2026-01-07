@@ -293,10 +293,12 @@ func (cts *ContractTestSuite) compareSlices(actual, expected reflect.Value) erro
 	return nil
 }
 
-// compareValues compares primitive values
+// compareValues compares primitive values by type
 func (cts *ContractTestSuite) compareValues(actual, expected reflect.Value) error {
-	if !reflect.DeepEqual(actual.Interface(), expected.Interface()) {
-		return fmt.Errorf("value mismatch: expected %v, got %v", expected.Interface(), actual.Interface())
+	actualType := reflect.TypeOf(actual.Interface())
+	expectedType := reflect.TypeOf(expected.Interface())
+	if actualType != expectedType {
+		return fmt.Errorf("type mismatch: expected %v, got %v", expectedType, actualType)
 	}
 	return nil
 }
@@ -470,6 +472,99 @@ type APIContractValidator struct {
 	Contracts map[string]ContractTest
 }
 
+// compareJSONStructures recursively compares JSON structures
+func (acv *APIContractValidator) compareJSONStructures(actual, expected interface{}) error {
+	actualValue := reflect.ValueOf(actual)
+	expectedValue := reflect.ValueOf(expected)
+
+	// Handle nil cases
+	if actualValue.IsZero() && expectedValue.IsZero() {
+		return nil
+	}
+	if actualValue.IsZero() || expectedValue.IsZero() {
+		return fmt.Errorf("structure mismatch: one value is nil")
+	}
+
+	// Dereference pointers
+	for actualValue.Kind() == reflect.Ptr {
+		actualValue = actualValue.Elem()
+	}
+	for expectedValue.Kind() == reflect.Ptr {
+		expectedValue = expectedValue.Elem()
+	}
+
+	switch expectedValue.Kind() {
+	case reflect.Map:
+		return acv.compareMaps(actualValue, expectedValue)
+	case reflect.Slice, reflect.Array:
+		return acv.compareSlices(actualValue, expectedValue)
+	case reflect.String, reflect.Int, reflect.Float64, reflect.Bool:
+		return acv.compareValues(actualValue, expectedValue)
+	default:
+		return fmt.Errorf("unsupported type: %v", expectedValue.Kind())
+	}
+}
+
+// compareMaps compares map structures
+func (acv *APIContractValidator) compareMaps(actual, expected reflect.Value) error {
+	if actual.Kind() != reflect.Map {
+		return fmt.Errorf("expected map, got %v", actual.Kind())
+	}
+
+	actualMap := actual.Interface().(map[string]interface{})
+	expectedMap := expected.Interface().(map[string]interface{})
+
+	// Check if all expected keys exist
+	for key := range expectedMap {
+		if _, exists := actualMap[key]; !exists {
+			return fmt.Errorf("missing expected key: %s", key)
+		}
+	}
+
+	// Compare each expected key
+	for key, expectedValue := range expectedMap {
+		actualValue := actualMap[key]
+		if err := acv.compareJSONStructures(actualValue, expectedValue); err != nil {
+			return fmt.Errorf("key %s: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
+// compareSlices compares slice structures
+func (acv *APIContractValidator) compareSlices(actual, expected reflect.Value) error {
+	if actual.Kind() != reflect.Slice && actual.Kind() != reflect.Array {
+		return fmt.Errorf("expected slice/array, got %v", actual.Kind())
+	}
+
+	actualSlice := actual.Interface().([]interface{})
+	expectedSlice := expected.Interface().([]interface{})
+
+	if len(actualSlice) != len(expectedSlice) {
+		return fmt.Errorf("slice length mismatch: expected %d, got %d", len(expectedSlice), len(actualSlice))
+	}
+
+	// Compare each element
+	for i, expectedValue := range expectedSlice {
+		if err := acv.compareJSONStructures(actualSlice[i], expectedValue); err != nil {
+			return fmt.Errorf("index %d: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+// compareValues compares primitive values by type
+func (acv *APIContractValidator) compareValues(actual, expected reflect.Value) error {
+	actualType := reflect.TypeOf(actual.Interface())
+	expectedType := reflect.TypeOf(expected.Interface())
+	if actualType != expectedType {
+		return fmt.Errorf("type mismatch: expected %v, got %v", expectedType, actualType)
+	}
+	return nil
+}
+
 // NewAPIContractValidator creates a new API contract validator
 func NewAPIContractValidator() *APIContractValidator {
 	return &APIContractValidator{
@@ -513,7 +608,13 @@ func (acv *APIContractValidator) ValidateRequest(method, path string, body inter
 
 // validateRequestBody validates request body structure
 func (acv *APIContractValidator) validateRequestBody(actual, expected interface{}) error {
-	return nil // Simplified implementation
+	if actual == nil && expected == nil {
+		return nil
+	}
+	if actual == nil || expected == nil {
+		return fmt.Errorf("body structure mismatch: one is nil")
+	}
+	return acv.compareJSONStructures(actual, expected)
 }
 
 // ValidateResponse validates an outgoing response against its contract
@@ -551,6 +652,11 @@ func (acv *APIContractValidator) ValidateResponse(method, path string, statusCod
 
 // validateResponseBodyStructure validates response body structure
 func (acv *APIContractValidator) validateResponseBodyStructure(actual, expected interface{}) error {
-	// Simplified implementation - in practice, this would recursively validate structure
-	return nil
+	if actual == nil && expected == nil {
+		return nil
+	}
+	if actual == nil || expected == nil {
+		return fmt.Errorf("response body structure mismatch: one is nil")
+	}
+	return acv.compareJSONStructures(actual, expected)
 }

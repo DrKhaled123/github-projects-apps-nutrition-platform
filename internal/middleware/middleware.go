@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"api-key-generator/internal/config"
@@ -53,10 +55,30 @@ func APIKeyAuth() echo.MiddlewareFunc {
 	}
 }
 
-// CORS configures CORS
+// CORS configures CORS with secure defaults
 func CORS() echo.MiddlewareFunc {
+	// Get allowed origins from environment or use secure defaults
+	allowedOrigins := []string{
+		"http://localhost:3000",
+		"http://localhost:8080",
+		"https://super.doctorhealthy1.com",
+		"https://api.doctorhealthy1.com",
+		"https://doctorhealthy1.com",
+	}
+
+	// Allow additional origins from environment if specified
+	if envOrigins := os.Getenv("CORS_ORIGINS"); envOrigins != "" {
+		envList := strings.Split(envOrigins, ",")
+		for _, origin := range envList {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				allowedOrigins = append(allowedOrigins, origin)
+			}
+		}
+	}
+
 	return middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
+		AllowOrigins: allowedOrigins,
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization, "X-API-Key"},
 		MaxAge:       int(12 * time.Hour / time.Second),

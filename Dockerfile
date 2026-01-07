@@ -1,66 +1,71 @@
-# Multi-stage Dockerfile for Go API with SQLite (CGO enabled)
-# Force cache invalidation - update this comment to force rebuild
-# Build version: 1759252953
-
-FROM golang:1.22-bookworm AS builder
+# Multi-stage build for optimized production image
+FROM golang:1.22-alpine AS builder
 
 # Install build dependencies
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    build-essential pkg-config libsqlite3-dev && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache git ca-certificates tzdata
 
-# Create app user for build stage
-RUN groupadd -g 1000 appuser && \
-    useradd -u 1000 -g appuser -s /bin/bash -m appuser
-
+# Set working directory
 WORKDIR /app
 
-# Copy go mod files for dependency caching
+# Copy go mod files
 COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
 # Copy source code
 COPY . .
 
-# Verify frontend directory exists (critical for serving UI)
-RUN if [ ! -d "frontend" ]; then \
-        echo "❌ ERROR: frontend directory not found!" && exit 1; \
-    else \
-        echo "✅ Frontend directory found with $(ls -1 frontend | wc -l) files"; \
-    fi
+# Build arguments for versioning
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME
 
-# Build the application with optimizations
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o main .
+# Build the application
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -o main .
 
-# Final stage - Use Debian for better SQLite CGO compatibility
-FROM debian:bookworm-slim
+# Production stage
+FROM alpine:3.18
 
-# Install runtime dependencies INCLUDING curl for health checks
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    ca-certificates curl && \
-    rm -rf /var/lib/apt/lists/*
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates tzdata curl sqlite-libs
 
 # Create non-root user
-RUN groupadd -g 1000 appuser && \
-    useradd -u 1000 -g appuser -s /bin/bash -m appuser
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 
+# Set working directory
 WORKDIR /app
 
-# Copy binary from builder
+# Copy binary from builder stage
 COPY --from=builder /app/main .
 
-# Create data directory with correct permissions
-RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+# Copy frontend files
+COPY --from=builder /app/frontend ./frontend
+
+# Copy configuration files
+COPY --from=builder /app/docker-compose.yml ./
+COPY --from=builder /app/nginx.conf ./
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/config && \
+    chown -R appuser:appgroup /app
 
 # Switch to non-root user
 USER appuser
 
-# Expose port (matches internal application port)
+# Expose port
 EXPOSE 8081
 
-# Enhanced health check with proper port and increased resilience
-HEALTHCHECK --interval=15s --timeout=10s --start-period=30s --retries=5 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
+
+# Set environment variables
+ENV PORT=8081
+ENV ENV=production
 
 # Run the application
 CMD ["./main"]

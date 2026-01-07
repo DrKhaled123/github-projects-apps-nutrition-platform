@@ -1,0 +1,126 @@
+{
+  "name": "DoctorHealthy1 - Your Health Companion",
+  "short_name": "DoctorHealthy1",
+  "description": "Personalized health, nutrition, and workout platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7fbff",
+  "theme_color": "#0ea5e9",
+  "orientation": "portrait-primary",
+  "categories": ["health", "fitness", "medical"],
+  "lang": "en",
+  "dir": "ltr",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/frontend/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/frontend/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/frontend/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/frontend/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/frontend/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/frontend/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/frontend/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/frontend/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/frontend/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop view of DoctorHealthy1"
+    },
+    {
+      "src": "/frontend/screenshots/mobile.png",
+      "sizes": "375x667",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile view of DoctorHealthy1"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Diet Plans",
+      "short_name": "Diet",
+      "description": "View your personalized diet plans",
+      "url": "/diet.html",
+      "icons": [
+        {
+          "src": "/frontend/icons/shortcut-diet.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Workouts",
+      "short_name": "Workouts",
+      "description": "Access your workout routines",
+      "url": "/workouts.html",
+      "icons": [
+        {
+          "src": "/frontend/icons/shortcut-workout.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Recipes",
+      "short_name": "Recipes",
+      "description": "Browse healthy recipes",
+      "url": "/recipes.html",
+      "icons": [
+        {
+          "src": "/frontend/icons/shortcut-recipe.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
+}

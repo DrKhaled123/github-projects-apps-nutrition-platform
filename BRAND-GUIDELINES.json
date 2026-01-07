@@ -1,0 +1,36 @@
+{
+  "name": "DoctorHealthy1",
+  "tagline": "Your Personalized Health Companion",
+  "mission": "Making evidence-based health guidance accessible to everyone",
+  "vision": "A world where personalized health optimization is available to all",
+  "colors": {
+    "primary": {
+      "Health Blue": "#0ea5e9",
+      "Health Green": "#10b981",
+      "Warning Yellow": "#facc15"
+    },
+    "usage": "Use Health Blue for primary actions, Health Green for success states, Warning Yellow for attention needed"
+  },
+  "typography": {
+    "primary": "Inter",
+    "hierarchy": {
+      "H1": "Bold, 2.25rem - Page titles and main headings",
+      "H2": "Semibold, 1.5rem - Section headings",
+      "H3": "Semibold, 1.25rem - Subsection headings",
+      "Body": "Regular, 1rem - Regular text",
+      "Caption": "Regular, 0.875rem - Secondary text"
+    }
+  },
+  "components": {
+    "Health Cards": "Rounded corners (12px), subtle shadows, primary color accents",
+    "Navigation": "Sticky header with gradient background",
+    "Buttons": "Rounded (10px), clear hierarchy with primary/secondary styles",
+    "Forms": "Clean, accessible, with clear validation states"
+  },
+  "accessibility": {
+    "Color Contrast": "WCAG AA compliant (4.5:1 ratio minimum)",
+    "Focus States": "Visible focus indicators on all interactive elements",
+    "Screen Readers": "Proper ARIA labels and semantic HTML",
+    "Keyboard Navigation": "Full keyboard accessibility"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "pipeline_name": "CI/CD Orchestration Pipeline",
+  "start_time": "2025-10-13T12:03:36.233597",
+  "end_time": "2025-10-13T12:03:36.388003",
+  "duration_seconds": 0.16,
+  "stages": {
+    "test": {
+      "overall_success": false,
+      "test_suites": {
+        "unit": {
+          "framework": "go",
+          "test_type": "unit",
+          "success": false,
+          "output": "FAIL\ttests/unit [setup failed]\nFAIL\n",
+          "errors": "# tests/unit\npackage tests/unit is not in std (/usr/local/go/src/tests/unit)\n",
+          "timestamp": "2025-10-13T12:03:36.386689"
+        }
+      },
+      "start_time": "2025-10-13T12:03:36.234296",
+      "end_time": "2025-10-13T12:03:36.387408",
+      "duration_seconds": 0.15,
+      "stage": "test"
+    }
+  },
+  "overall_success": false,
+  "failed_stage": "test"
+}

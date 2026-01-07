@@ -13,9 +13,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	"yourproject/pkg/quota"
-	"yourproject/pkg/ratelimit"
-	"yourproject/pkg/session"
+	"api-key-generator/pkg/quota"
+	"api-key-generator/pkg/ratelimit"
+	"api-key-generator/pkg/session"
 )
 
 func main() {

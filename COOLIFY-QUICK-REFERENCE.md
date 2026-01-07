@@ -6,7 +6,7 @@
 ```
 Coolify Dashboard: http://128.140.111.171:8000
 Application UUID: hcw0gc8wcwk440gw4c88408o
-API Token: 4|jdTX2lUb2q6IOrwNGkHyQBCO74JJeeRHZVvFNwgI6b376a50
+API Token: [REDACTED - Generate new token in Coolify dashboard]
 ```
 
 ### 🔗 Your Domains

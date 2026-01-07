@@ -1,0 +1,359 @@
+version: '3.8'
+
+services:
+  # Dokploy Main Application
+  dokploy:
+    image: dokploy/dokploy:latest
+    container_name: dokploy-main
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dokploy_data:/var/lib/dokploy
+      - dokploy_backups:/var/lib/dokploy/backups
+      - dokploy_ssl:/etc/ssl/certs
+    environment:
+      - NODE_ENV=production
+      - DOMAIN=${DOKPLOY_DOMAIN:-localhost}
+      - NEXT_PUBLIC_DOMAIN=${DOKPLOY_DOMAIN:-localhost}
+      - NEXTAUTH_URL=${DOKPLOY_NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${DOKPLOY_NEXTAUTH_SECRET:-your-secret-key-here}
+      - DATABASE_URL=postgresql://postgres:${DOKPLOY_DB_PASSWORD}@postgres:5432/dokploy
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: dokploy-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgres/init:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_DB=dokploy
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${DOKPLOY_DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching and Sessions
+  redis:
+    image: redis:7-alpine
+    container_name: dokploy-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./database/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Dokploy Monitoring Service
+  dokploy-monitoring:
+    build:
+      context: ./dokploy-repo/apps/monitoring
+      dockerfile: Dockerfile
+    container_name: dokploy-monitoring
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - monitoring_data:/data
+    environment:
+      - METRICS_CONFIG=${DOKPLOY_METRICS_CONFIG}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    depends_on:
+      - dokploy
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MySQL Database (for applications)
+  mysql:
+    image: mysql:8.0
+    container_name: dokploy-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - mysql_backups:/var/lib/mysql/backups
+      - ./database/mysql/init:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DOKPLOY_MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=dokploy_apps
+      - MYSQL_USER=dokploy
+      - MYSQL_PASSWORD=${DOKPLOY_MYSQL_PASSWORD}
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --binlog-expire-logs-seconds=172800
+      --max-binlog-size=100M
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB Database (for applications)
+  mongodb:
+    image: mongo:7.0
+    container_name: dokploy-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_backups:/data/backups
+      - ./database/mongodb/init:/docker-entrypoint-initdb.d
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DOKPLOY_MONGO_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${DOKPLOY_MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=dokploy_apps
+    command: mongod --auth --bind_ip_all
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MariaDB Database (for applications)
+  mariadb:
+    image: mariadb:11.1
+    container_name: dokploy-mariadb
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - mariadb_backups:/var/lib/mysql/backups
+      - ./database/mariadb/init:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DOKPLOY_MARIADB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=dokploy_apps
+      - MYSQL_USER=dokploy
+      - MYSQL_PASSWORD=${DOKPLOY_MARIADB_PASSWORD}
+    networks:
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v3.1
+    container_name: dokploy-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./monitoring/traefik/traefik.yml:/etc/traefik/traefik.yml
+      - ./monitoring/traefik/dynamic:/etc/traefik/dynamic
+      - dokploy_ssl:/etc/ssl/certs
+      - traefik_logs:/var/log/traefik
+    networks:
+      - dokploy-network
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${DOKPLOY_LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOKPLOY_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+  # Grafana for Monitoring Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dokploy-grafana
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=${DOKPLOY_GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${DOKPLOY_GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SERVER_DOMAIN=${DOKPLOY_DOMAIN:-localhost}
+      - GF_SERVER_ROOT_URL=http://grafana.${DOKPLOY_DOMAIN:-localhost}
+    networks:
+      - dokploy-network
+    depends_on:
+      - prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOKPLOY_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+
+  # Prometheus for Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dokploy-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOKPLOY_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+
+  # Node Exporter for System Metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: dokploy-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - dokploy-network
+
+  # cAdvisor for Container Metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: dokploy-cadvisor
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - dokploy-network
+
+  # AlertManager for Alerts
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: dokploy-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - alertmanager_data:/alertmanager
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - dokploy-network
+
+volumes:
+  dokploy_data:
+    driver: local
+  dokploy_backups:
+    driver: local
+  dokploy_ssl:
+    driver: local
+  postgres_data:
+    driver: local
+  mysql_data:
+    driver: local
+  mysql_backups:
+    driver: local
+  mongodb_data:
+    driver: local
+  mongodb_backups:
+    driver: local
+  mariadb_data:
+    driver: local
+  mariadb_backups:
+    driver: local
+  redis_data:
+    driver: local
+  monitoring_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  traefik_logs:
+    driver: local
+
+networks:
+  dokploy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

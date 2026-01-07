@@ -1,0 +1,75 @@
+{
+  "colors": {
+    "primary": {
+      "health-blue": "#0ea5e9",
+      "health-green": "#10b981",
+      "health-warn": "#facc15",
+      "health-text": "#0f172a",
+      "health-muted": "#475569",
+      "health-bg": "#f7fbff"
+    },
+    "semantic": {
+      "success": "#10b981",
+      "warning": "#f59e0b",
+      "error": "#ef4444",
+      "info": "#3b82f6",
+      "vital": "#dc2626",
+      "stable": "#059669",
+      "attention": "#d97706"
+    },
+    "gradients": {
+      "health-gradient": "linear-gradient(90deg, #0ea5e9, #10b981)",
+      "warm-gradient": "radial-gradient(1200px 400px at 50% -100px, rgba(14,165,233,.25), transparent)"
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "primary": "Inter, system-ui, -apple-system, sans-serif",
+      "heading": "Inter, system-ui, sans-serif",
+      "mono": "JetBrains Mono, Consolas, monospace"
+    },
+    "fontSize": {
+      "xs": "0.75rem",
+      "sm": "0.875rem",
+      "base": "1rem",
+      "lg": "1.125rem",
+      "xl": "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "1.875rem",
+      "4xl": "2.25rem"
+    },
+    "fontWeight": {
+      "light": "300",
+      "normal": "400",
+      "medium": "500",
+      "semibold": "600",
+      "bold": "700",
+      "extrabold": "800"
+    }
+  },
+  "spacing": {
+    "health-xs": "0.25rem",
+    "health-sm": "0.5rem",
+    "health-md": "1rem",
+    "health-lg": "1.5rem",
+    "health-xl": "2rem",
+    "health-2xl": "3rem"
+  },
+  "borders": {
+    "health-radius-sm": "0.375rem",
+    "health-radius-md": "0.5rem",
+    "health-radius-lg": "0.75rem",
+    "health-radius-xl": "1rem"
+  },
+  "shadows": {
+    "health-sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+    "health-md": "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+    "health-lg": "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+    "health-xl": "0 20px 25px -5px rgb(0 0 0 / 0.1)"
+  },
+  "animations": {
+    "pulse-health": "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+    "bounce-health": "bounce 1s infinite",
+    "spin-health": "spin 1s linear infinite"
+  }
+}

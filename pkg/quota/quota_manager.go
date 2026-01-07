@@ -13,10 +13,10 @@ import (
 
 // QuotaConfig holds quota configuration
 type QuotaConfig struct {
-	MonthlyLimit     int
-	StorageBackend   StorageBackend
-	CleanupInterval  time.Duration
-	EnableMetrics    bool
+	MonthlyLimit    int
+	StorageBackend  StorageBackend
+	CleanupInterval time.Duration
+	EnableMetrics   bool
 }
 
 // StorageBackend defines interface for quota storage
@@ -31,8 +31,8 @@ type StorageBackend interface {
 
 // MemoryStorage implements in-memory storage (for development)
 type MemoryStorage struct {
-	mu     sync.RWMutex
-	data   map[string]map[string]int // userID -> monthKey -> count
+	mu   sync.RWMutex
+	data map[string]map[string]int // userID -> monthKey -> count
 }
 
 func NewMemoryStorage() *MemoryStorage {

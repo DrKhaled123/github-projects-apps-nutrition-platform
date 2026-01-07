@@ -23,6 +23,61 @@ from factory_config import (
     FactoryConfig
 )
 
+import re
+import shlex
+
+
+def _is_safe_path(path: str) -> bool:
+    """Validate that a path is safe and doesn't contain dangerous characters"""
+    if not path or not isinstance(path, str):
+        return False
+
+    # Check for path traversal attempts
+    if '..' in path or path.startswith('/'):
+        return False
+
+    # Check for dangerous characters
+    dangerous_chars = ['|', '&', ';', '$', '>', '<', '`', '$(', '${']
+    if any(char in path for char in dangerous_chars):
+        return False
+
+    # Allow only alphanumeric, dots, hyphens, underscores, and forward slashes
+    safe_pattern = re.compile(r'^[a-zA-Z0-9._/-]+$')
+    return bool(safe_pattern.match(path))
+
+
+def _is_safe_image_name(image_name: str) -> bool:
+    """Validate that an image name is safe"""
+    if not image_name or not isinstance(image_name, str):
+        return False
+
+    # Check for dangerous characters
+    dangerous_chars = ['|', '&', ';', '$', '>', '<', '`', '$(', '${']
+    if any(char in image_name for char in dangerous_chars):
+        return False
+
+    # Allow only alphanumeric, dots, hyphens, underscores, colons, and forward slashes
+    safe_pattern = re.compile(r'^[a-zA-Z0-9._/:-]+$')
+    return bool(safe_pattern.match(image_name))
+
+
+def _validate_command_input(command: str) -> bool:
+    """Validate that a command string is safe"""
+    if not command or not isinstance(command, str):
+        return False
+
+    # Check for dangerous command patterns
+    dangerous_patterns = [
+        r';\s*rm\s+', r';\s*del\s+', r'\|\s*rm\s+', r'\|\s*del\s+',
+        r';\s*shutdown\s+', r'format\s+', r'fdisk\s+', r'mkfs\s+'
+    ]
+
+    command_lower = command.lower()
+    for pattern in dangerous_patterns:
+        if re.search(pattern, command_lower):
+            return False
+
+    return True
 
 def execute_deployment_task(task_type: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -209,7 +264,7 @@ def _execute_docker_build(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
         cmd = f"docker build -f {dockerfile} -t {image_name} {build_context}"
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
         return {
             "success": result.returncode == 0,
@@ -234,7 +289,7 @@ def _execute_test_run(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if coverage:
             cmd = f"{test_command} -cover"
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
         return {
             "success": result.returncode == 0,
@@ -327,7 +382,7 @@ def _execute_security_scan(parameters: Dict[str, Any]) -> Dict[str, Any]:
             # Basic security checks
             cmd = "find . -name '*.sh' -exec chmod +x {} \\; && find . -type f -name '*.py' -exec python -m py_compile {{}} \\;"
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
         return {
             "success": result.returncode == 0,
@@ -358,7 +413,7 @@ def _execute_performance_test(parameters: Dict[str, Any]) -> Dict[str, Any]:
             # Custom performance test
             cmd = parameters.get("custom_command", "echo 'Performance test completed'")
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
         return {
             "success": result.returncode == 0,
@@ -388,7 +443,7 @@ def _execute_database_migration(parameters: Dict[str, Any]) -> Dict[str, Any]:
         else:
             cmd = parameters.get("custom_migration_command", "echo 'Migration completed'")
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
         return {
             "success": result.returncode == 0,
@@ -427,7 +482,7 @@ def _execute_backup_create(parameters: Dict[str, Any]) -> Dict[str, Any]:
         else:
             cmd = parameters.get("custom_backup_command", f"echo 'Backup created at {backup_path}'")
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
         return {
             "success": result.returncode == 0,
@@ -469,7 +524,7 @@ EOF
             # Basic monitoring setup
             cmd = "mkdir -p monitoring && echo 'Monitoring setup completed'"
 
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
         return {
             "success": result.returncode == 0,
@@ -508,7 +563,7 @@ def _execute_generic_task(task_type: str, parameters: Dict[str, Any]) -> Dict[st
         if commands:
             # Execute the first command as a test
             cmd = commands[0].lstrip('$').strip()
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=".")
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
 
             return {
                 "success": result.returncode == 0,
